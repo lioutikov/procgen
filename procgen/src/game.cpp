@@ -32,6 +32,11 @@ Game::Game() {
     step_data.reward = 0;
     step_data.done = false;
     step_data.level_complete = false;
+
+    register_info_buffer("level_seed");
+    register_info_buffer("level_complete");
+    register_obs_buffer("rgb");
+
 }
 
 Game::~Game() {
@@ -55,7 +60,7 @@ void Game::parse_options(std::string name, VecOptions opts) {
     } else if (options.distribution_mode == ExtremeMode) {
         fassert(name == "chaser" || name == "dodgeball" || name == "leaper" || name == "starpilot");
     } else if (options.distribution_mode == MemoryMode) {
-        fassert(name == "caveflyer" || name == "dodgeball" || name == "heist" || name == "jumper" || name == "maze" || name == "miner");
+        fassert(name == "collector" || name == "caveflyer" || name == "dodgeball" || name == "heist" || name == "jumper" || name == "maze" || name == "miner");
     } else {
         fatal("invalid distribution_mode %d\n", options.distribution_mode);
     }
@@ -65,6 +70,23 @@ void Game::parse_options(std::string name, VecOptions opts) {
     opts.consume_int("physics_mode", &options.physics_mode);
     opts.consume_int("debug_mode", &options.debug_mode);
     opts.consume_int("game_type", &game_type);
+
+
+    for (auto name : opts.get_names()){
+      if (options.exists<uint8_t>(name)){
+        bool dummy;
+        opts.consume_bool(name, &dummy);
+        options.assign<uint8_t>(name, dummy);
+      }else if (options.exists<int32_t>(name)){
+        int dummy;
+        opts.consume_int(name, &dummy);
+        options.assign<int32_t>(name, dummy);
+      }else if (options.exists<float>(name)){
+        float dummy;
+        opts.consume_float(name, &dummy);
+        options.assign<float>(name, dummy);
+      }
+    }
 
     opts.ensure_empty();
 }
@@ -147,13 +169,70 @@ void Game::step() {
 
     episode_done = step_data.done;
 
-    render_to_buf(render_buf, RES_W, RES_H, false);
-    bgr32_to_rgb888(obs_bufs[0], render_buf, RES_W, RES_H);
+    auto ptr = point_to_obs<uint8_t>("rgb");
+    if (ptr != 0){
+      render_to_buf(render_buf, RES_W, RES_H, false);
+      bgr32_to_rgb888(ptr, render_buf, RES_W, RES_H);
+    }
+
     *reward_ptr = step_data.reward;
     *done_ptr = (uint8_t)step_data.done;
-    *(int32_t*)(info_bufs[0]) = (int32_t)(level_seed);
-    *(int32_t*)(info_bufs[1]) = (int32_t)(step_data.level_complete);
+    assign_to_info("level_seed",(int32_t)(level_seed));
+    assign_to_info("level_complete",(uint8_t)(step_data.level_complete));
 }
 
 void Game::game_init() {
+}
+
+void Game::register_info_buffer(std::string name){
+  info_buffers[name] = GameSpaceBuffer();
+}
+
+void Game::register_obs_buffer(std::string name){
+  obs_buffers[name] = GameSpaceBuffer();
+}
+
+void Game::connect_buffer(std::map<std::string, GameSpaceBuffer> &buffer_map, const std::vector<struct libenv_space> &spaces, const std::vector<void *> &buffer){
+  for (int i = 0 ; i < spaces.size(); i++){
+    auto bptr = buffer_map.find(spaces[i].name);
+    if (bptr == buffer_map.end()){
+      printf("No in-game buffer registerd for space '%s'\n", spaces[i].name);
+      fassert(false);
+    }
+    bptr->second.space = &spaces[i];
+    bptr->second.buffer = buffer[i];
+  }
+}
+
+void Game::connect_info_buffer(const std::vector<struct libenv_space> &spaces, const std::vector<void *> &buffer){
+  connect_buffer(info_buffers, spaces, buffer);
+}
+
+void Game::assign_to_info(const std::string name, uint8_t value){
+  assign_to_buffer<uint8_t>(name, info_buffers, value);
+}
+
+void Game::assign_to_info(const std::string name, int32_t value){
+  assign_to_buffer<int32_t>(name, info_buffers, value);
+}
+
+void Game::assign_to_info(const std::string name, float value){
+  assign_to_buffer<float>(name, info_buffers, value);
+}
+
+
+void Game::connect_obs_buffer(const std::vector<struct libenv_space> &spaces, const std::vector<void *> &buffer){
+  connect_buffer(obs_buffers, spaces, buffer);
+}
+
+void Game::assign_to_obs(const std::string name, uint8_t value){
+  assign_to_buffer<uint8_t>(name, obs_buffers, value);
+}
+
+void Game::assign_to_obs(const std::string name, int32_t value){
+  assign_to_buffer<int32_t>(name, obs_buffers, value);
+}
+
+void Game::assign_to_obs(const std::string name, float value){
+  assign_to_buffer<float>(name, obs_buffers, value);
 }

@@ -36,6 +36,10 @@ if (APPLE OR UNIX)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -fno-omit-frame-pointer")
 endif()
 
+if(UNIX)
+  add_compile_options(-fdiagnostics-color=always)
+endif()
+
 # find libenv.h header
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -54,11 +58,13 @@ add_library(env
   src/games/bigfish.cpp
   src/games/bossfight.cpp
   src/games/caveflyer.cpp
+#  src/games/collector.cpp
   src/games/climber.cpp
   src/games/coinrun_old.cpp
   src/games/coinrun.cpp
   src/games/fruitbot.cpp
   src/games/heist.cpp
+  src/games/heistpp.cpp
   src/games/jumper.cpp
   src/games/leaper.cpp
   src/games/maze.cpp

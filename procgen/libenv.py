@@ -32,6 +32,49 @@ class CVecEnv:
         reuse_arrays: reduce allocations by using the same numpy arrays for each reset(), step(), and render() call
     """
 
+    class C_Space:
+
+        def __init__(
+            self,
+            name: str,
+            is_discrete: bool,
+            shape: tuple,
+            dtype: type,
+            limits: tuple
+        ) -> None:
+            self.name = name
+            self.is_discrete = is_discrete
+            self.shape = shape
+            self.dtype = dtype
+            self.limits = limits
+
+        def to_libenv_space(self, ffi, c_lib):
+            c_space = ffi.new("struct libenv_space *")
+
+            assert (
+                len(self.name) < c_lib.LIBENV_MAX_NAME_LEN - 1
+            ), "length of space name is too long"
+
+            c_space.name = self.name.encode("utf8")
+            c_space.type = c_lib.LIBENV_SPACE_TYPE_DISCRETE if self.is_discrete else c_lib.LIBENV_SPACE_TYPE_BOX
+            c_space.dtype = CVecEnv._var_to_libenv(ffi, c_lib, self.dtype)
+            for i, dim in enumerate(self.shape):
+                c_space.shape[i] = dim
+            c_space.ndim = len(self.shape)
+
+            if c_space.dtype == c_lib.LIBENV_DTYPE_UINT8:
+                c_space.low.uint8 = self.limits[0]
+                c_space.high.uint8 = self.limits[1]
+            elif c_space.dtype == c_lib.LIBENV_DTYPE_INT32:
+                c_space.low.int32 = self.limits[0]
+                c_space.high.int32 = self.limits[1]
+            elif c_space.dtype == c_lib.LIBENV_DTYPE_FLOAT32:
+                c_space.low.float32 = self.limits[0]
+                c_space.high.float32 = self.limits[1]
+            else:
+                assert False,"Unknown dtype! This should never happen!"
+            return c_space
+
     def __init__(
         self,
         num_envs: int,
@@ -41,6 +84,8 @@ class CVecEnv:
         options: Optional[Dict] = None,
         debug: bool = False,
         reuse_arrays: bool = False,
+        additional_info_spaces: list = None,
+        additional_obs_spaces: list = None,
     ) -> None:
         self._debug = debug
         self._reuse_arrays = reuse_arrays
@@ -109,6 +154,17 @@ class CVecEnv:
 
         self._c_env = self._c_lib.libenv_make(num_envs, c_options[0])
 
+        if additional_obs_spaces is not None:
+            for space in additional_obs_spaces:
+                print(f"adding obs space: {space}")
+                self._c_lib.libenv_add_space(self._c_env, self._c_lib.LIBENV_SPACES_OBSERVATION, space.to_libenv_space(self._ffi, self._c_lib) )
+
+        if additional_info_spaces is not None:
+            for space in additional_info_spaces:
+                print(f"adding info space: {space}")
+                self._c_lib.libenv_add_space(self._c_env, self._c_lib.LIBENV_SPACES_INFO, space.to_libenv_space(self._ffi, self._c_lib) )
+
+        
         self.reward_range = (float("-inf"), float("inf"))
         self.spec = None
         self.num_envs = num_envs
@@ -116,7 +172,7 @@ class CVecEnv:
         self._action_space = self._get_spaces(self._c_lib.LIBENV_SPACES_ACTION)
         self._info_space = self._get_spaces(self._c_lib.LIBENV_SPACES_INFO)
         self._render_space = self._get_spaces(self._c_lib.LIBENV_SPACES_RENDER)
-
+        
         # allocate buffers
         self._observations, self._observation_buffers = self._allocate_dict_space(
             self.num_envs, self.observation_space
@@ -499,6 +555,61 @@ class CVecEnv:
                     :,
                 ] = images[idx]
         return result
+
+    @staticmethod
+    def _var_to_libenv(ffi, c_lib, var):
+        _t, _v = (var, None) if (type(var) == type) else (type(var), var)
+        print(f"hmm... {_t} {_v}")
+
+
+        if issubclass(_t, bytes):
+            dtype = c_lib.LIBENV_DTYPE_UINT8
+            if _v is None:
+                return dtype
+            return dtype, ffi.new("char[]", _v), len(_v)
+
+        if issubclass(_t, str):
+            dtype = c_lib.LIBENV_DTYPE_UINT8
+            if _v is None:
+                return dtype
+            return dtype, ffi.new("char[]", _v.encode("utf8")), len(_v)
+
+        if issubclass(_t, bool):
+            dtype = c_lib.LIBENV_DTYPE_UINT8
+            if _v is None:
+                return dtype
+            return dtype, ffi.new("uint8_t*", _v), 1
+
+        if issubclass(_t, int):
+            dtype = c_lib.LIBENV_DTYPE_INT32
+            if _v is  None:
+                return dtype
+            assert -2 ** 31 < _v < 2 ** 31
+            return dtype, ffi.new("int32_t*", _v), 1
+
+        if issubclass(_t, float):
+            dtype = c_lib.LIBENV_DTYPE_FLOAT32
+            if _v is None:
+                return dtype
+            return dtype, ffi.new("float*", _v), 1
+
+        if issubclass(_t, np.ndarray):
+            assert _v is not None, f"{_t} can have different dtypes. Use a specific instance."
+            if _v.dtype == np.dtype("uint8"):
+                dtype = c_lib.LIBENV_DTYPE_UINT8
+            elif _v.dtype == np.dtype("int32"):
+                dtype = c_lib.LIBENV_DTYPE_INT32
+            elif _v.dtype == np.dtype("float32"):
+                dtype = c_lib.LIBENV_DTYPE_FLOAT32
+            else:
+                assert False, f"unsupported type {_v.dtype}"
+            return dtype, ffi.new("char[]", _v.tobytes()), _v.size
+
+        assert False, f"unsupported value {var}"
+
+    @staticmethod
+    def _var_from_libenv():
+        pass
 
     def get_images(self) -> np.ndarray:
         """

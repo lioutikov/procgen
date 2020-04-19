@@ -149,6 +149,7 @@ class BasicAbstractGame : public Game {
     float visibility = 0.0f;
     float min_visibility = 0.0f;
 
+    virtual void draw_entity(QPainter &p, const std::shared_ptr<Entity> &to_draw);
   private:
     Grid<int> grid;
 
@@ -156,7 +157,6 @@ class BasicAbstractGame : public Game {
     void initialize_asset_if_necessary(int img_idx);
     void prepare_for_drawing(float rect_height);
     void draw_background(QPainter &p, const QRect &rect);
-    void draw_entity(QPainter &p, const std::shared_ptr<Entity> &to_draw);
     void draw_entities(QPainter &p, const std::vector<std::shared_ptr<Entity>> &to_draw, int render_z = 0);
     void draw_image(QPainter &p, QRectF &rect, float rotation, bool is_reflected, int img_idx, int theme, float alpha, float tile_ratio);
 

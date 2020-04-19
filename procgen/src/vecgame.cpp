@@ -68,6 +68,11 @@ int libenv_get_spaces(libenv_venv *env, enum libenv_spaces_name name,
     return (int)(in_spaces.size());
 }
 
+int libenv_add_space(libenv_venv *env, enum libenv_spaces_name name, struct libenv_space *sp){
+  auto venv = (VecGame *)(env);
+  return venv->add_space(name, sp);
+}
+
 void libenv_reset(libenv_venv *env, struct libenv_step *step) {
     auto venv = (VecGame *)(env);
     auto obs = convert_bufs(step->obs, venv->num_envs,
@@ -109,7 +114,7 @@ void libenv_close(libenv_venv *env) {
 
 // end libenv api
 
-static void stepping_worker(std::mutex& stepping_thread_mutex, 
+static void stepping_worker(std::mutex& stepping_thread_mutex,
             std::list<std::shared_ptr<Game>>& pending_games,
             std::condition_variable& pending_games_added,
             std::condition_variable& pending_game_complete, bool& time_to_die) {
@@ -315,6 +320,30 @@ VecGame::VecGame(int _nenvs, VecOptions opts) {
     }
 }
 
+int VecGame::add_space(int space_identifier, struct libenv_space *sp){
+  {
+      struct libenv_space s = *sp;
+      if (space_identifier == LIBENV_SPACES_OBSERVATION) {
+        observation_spaces.push_back(s);
+        return observation_spaces.size()-1;
+      }
+      if (space_identifier == LIBENV_SPACES_ACTION) {
+        action_spaces.push_back(s);
+        return action_spaces.size()-1;
+      }
+      if (space_identifier == LIBENV_SPACES_INFO) {
+        info_spaces.push_back(s);
+        return info_spaces.size()-1;
+      }
+      if (space_identifier == LIBENV_SPACES_RENDER) {
+        render_spaces.push_back(s);
+        return render_spaces.size()-1;
+      }
+      fatal("Unknown space_identifier: %d\n", space_identifier);
+      return -1;
+  }
+}
+
 void VecGame::reset(const std::vector<std::vector<void *>> &obs) {
     if (!first_reset) {
         printf("WARNING: Procgen ignores resets, please create a new environment "
@@ -344,6 +373,8 @@ void VecGame::step_async(const std::vector<int32_t> &acts,
             game->action = acts[e];
             game->obs_bufs = obs[e];
             game->info_bufs = infos[e];
+            game->connect_obs_buffer(observation_spaces, obs[e]);
+            game->connect_info_buffer(info_spaces, infos[e]);
             game->reward_ptr = &rews[e];
             game->done_ptr = &dones[e];
             fassert(!game->is_waiting_for_step);

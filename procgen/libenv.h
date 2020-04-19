@@ -190,6 +190,8 @@ LIBENV_API bool libenv_render(libenv_venv *handle, const char *mode, void **fram
 // libenv_close closes the environment and frees any resources associated with it
 LIBENV_API void libenv_close(libenv_venv *handle);
 
+LIBENV_API int libenv_add_space(libenv_venv *handle, enum libenv_spaces_name name, struct libenv_space *sp);
+
 #endif
 
 // END_CDEF

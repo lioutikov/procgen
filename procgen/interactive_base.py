@@ -154,6 +154,15 @@ class Interactive(abc.ABC):
             anchor_y="center",
         )
 
+        self._skip_info_out = []
+        self._step_cbs = []
+
+    def skip_info_out(self, name):
+        self._skip_info_out.append(name)
+
+    def add_step_callback(self, cb):
+        self._step_cbs.append(cb)
+
     def _update(self, dt):
         # if we're displaying done info, don't advance the simulation
         if self._seconds_to_display_done_info > 0:
@@ -198,7 +207,11 @@ class Interactive(abc.ABC):
             act = self.keys_to_act(keys)
 
             if not self._sync or act is not None:
+
+                if act is None:
+                    act = 4
                 obs, rew, done, info = self._env.step(act)
+
                 self._image = self.get_image(obs, self._env)
                 if self._movie_writer is not None:
                     self._movie_writer.append_data(self._image)
@@ -206,6 +219,10 @@ class Interactive(abc.ABC):
                 self._episode_return += rew
                 self._steps += 1
                 self._episode_steps += 1
+
+                for cb in self._step_cbs:
+                    cb(obs, rew, done, info, self._episode_steps, self._episode_return)
+
                 self._last_info = dict(episode_steps=self._episode_steps, episode_return=self._episode_return, **info)
                 np.set_printoptions(precision=2)
                 done_int = int(done)  # shorter than printing True/False
@@ -250,7 +267,8 @@ class Interactive(abc.ABC):
     def _format_info(self):
         info_text = ""
         for k, v in sorted(self._last_info.items()):
-            info_text += f"{k}: {v}\n"
+            if k not in self._skip_info_out:
+                info_text += f"{k}: {v}\n"
         return info_text
 
     def _draw(self):
@@ -260,7 +278,7 @@ class Interactive(abc.ABC):
             self._done_info_label.text = "=== episode complete ===\n\n" + self._format_info()
             self._done_info_label.draw()
             return
-        
+
         gl.glBindTexture(gl.GL_TEXTURE_2D, self._texture_id)
         image_bytes = self._image.tobytes()
         video_buffer = ctypes.cast(

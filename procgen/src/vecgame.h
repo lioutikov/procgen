@@ -38,6 +38,8 @@ class VecGame {
     void step_wait();
     bool render(const std::string &mode, const std::vector<void *> &arrays);
 
+    int add_space(int space_identifier, struct libenv_space *sp);
+
   private:
     // this mutex synchronizes access to pending_games and game->is_waiting_for_step
     // when game->is_waiting_for_step is set to true

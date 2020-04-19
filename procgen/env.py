@@ -12,11 +12,13 @@ ENV_NAMES = [
     "bossfight",
     "caveflyer",
     "chaser",
+#    "collector",
     "climber",
     "coinrun",
     "dodgeball",
     "fruitbot",
     "heist",
+    "heistpp",
     "jumper",
     "leaper",
     "maze",
@@ -77,6 +79,8 @@ class BaseProcgenEnv(CVecEnv):
         debug_mode=0,
         resource_root=None,
         num_threads=4,
+        additional_info_spaces = None,
+        additional_obs_spaces = None,
     ):
         if resource_root is None:
             resource_root = os.path.join(SCRIPT_DIR, "data", "assets") + os.sep
@@ -113,7 +117,7 @@ class BaseProcgenEnv(CVecEnv):
         self.options = options
 
         super().__init__(
-            lib_dir=lib_dir, num_envs=num_envs, debug=debug, options=options
+            lib_dir=lib_dir, num_envs=num_envs, debug=debug, options=options, additional_info_spaces=additional_info_spaces, additional_obs_spaces=additional_obs_spaces
         )
 
     def get_combos(self):

@@ -3,7 +3,7 @@
 Example random agent script to demonstrate that procgen works
 """
 
-# import gym
+import gym
 from procgen import ProcgenEnv
 import argparse
 import numpy as np
@@ -40,9 +40,9 @@ def main():
         'action_bonus':-1.0,
         }
 
-    # env = gym.make('procgen:procgen-heistpp-v0')
+    env = gym.make('procgen:procgen-heistpp-v0')
 
-    env = ProcgenEnv(num_envs=1, env_name="heistpp", **kwargs)
+    # env = ProcgenEnv(num_envs=1, env_name="heistpp", **kwargs)
 
     obs = env.reset()
     step = 0
@@ -50,9 +50,9 @@ def main():
         env.render()
         obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
         print(f"step {step} reward {rew} done {done}")
-        print(info[0]['state'])
+        # print(info[0]['state'])
         step += 1
-        if any(done):
+        if done:
             break
 
     env.close()

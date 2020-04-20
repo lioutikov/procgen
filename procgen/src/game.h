@@ -75,14 +75,14 @@ struct GameOption : public GameOptionBase {
     return data[0];
   }
 
-  void assign(T* value, uint32_t size){
-    fassert(this->size >= size);
+  void assign(T* value, uint32_t asssign_size){
+    fassert(size >= asssign_size);
     std::cout << "Not yet implemented" << std::endl;
     fassert(false);
   }
 
-  void assign(T* value, uint32_t size, uint32_t offset){
-    fassert(this->size >= size+offset);
+  void assign(T* value, uint32_t asssign_size, uint32_t offset){
+    fassert(size >= asssign_size+offset);
     std::cout << "Not yet implemented" << std::endl;
     fassert(false);
   }

@@ -24,8 +24,6 @@ class HeistppStatePlotter():
 
     def __call__(self, obs, rew, done, info, episode_steps, episode_return):
 
-        # The state of each cell is encoded as following:
-        # {100:'emmpty',51:'wall',21:'fire',20:'water',9:'exit',2:'key',1:'door'}
         if self.map is None:
             self.map = {}
             for i, v in enumerate(sorted(np.unique(info['state'][7:]))):
@@ -70,6 +68,20 @@ def main():
 
     world_dim = int(10)
     kwargs["additional_info_spaces"] = [ProcgenEnv.C_Space("state", False, (7+world_dim*world_dim,), bytes, (0,255))]
+    # SO FAR FOR HEISTPP ONLY!
+    # state[0] is the current cell_index of the agent.
+    # Compute coordinates: x,y = (cell_index % world_dim), (cell_index // world_dim)
+    #
+    # state[1:4] indicates if the agent has collected key 1,2,3 respectively.
+    # 0: not collected
+    # 1: collected
+    #
+    # state[5:7] indicates if the agent has opened door 1,2,3 respectively.
+    # 0: not opened
+    # 1: opened
+    #
+    # state[7:world_dim*world_dim+7] is the current world_map without the agent, collected keys and opened doors.
+    # check 'asset_to_state' map in 'heistpp.cpp' for the definition of each state value.
 
     kwargs["options"] = {
         'world_dim':world_dim,

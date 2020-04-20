@@ -3,6 +3,7 @@
 Example random agent script to demonstrate that procgen works
 """
 
+import gym
 from procgen import ProcgenEnv
 import argparse
 import numpy as np
@@ -24,6 +25,22 @@ def main():
 
     world_dim = int(10)
     kwargs["additional_info_spaces"] = [ProcgenEnv.C_Space("state", False, (7+world_dim*world_dim,), bytes, (0,255))]
+    # SO FAR FOR HEISTPP ONLY!
+    # state[0] is the current cell_index of the agent.
+    # Compute coordinates: x,y = (cell_index % world_dim), (cell_index // world_dim)
+    #
+    # state[1:4] indicates if the agent has collected key 1,2,3 respectively.
+    # 0: not collected
+    # 1: collected
+    #
+    # state[5:7] indicates if the agent has opened door 1,2,3 respectively.
+    # 0: not opened
+    # 1: opened
+    #
+    # state[7:world_dim*world_dim+7] is the current world_map without the agent, collected keys and opened doors.
+    # check 'asset_to_state' map in 'heistpp.cpp' for the definition of each state value.
+
+
 
     kwargs["options"] = {
         'world_dim':world_dim,
@@ -39,7 +56,7 @@ def main():
         'action_bonus':-1.0,
         }
 
-    env = ProcgenEnv(num_envs=1, env_name="heistpp", **kwargs)
+    env = gym.make('procgen:procgen-heistpp-v0',**kwargs)
 
     obs = env.reset()
     step = 0
@@ -47,9 +64,9 @@ def main():
         env.render()
         obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
         print(f"step {step} reward {rew} done {done}")
-        print(info[0]['state'])
+        print(info['state'])
         step += 1
-        if any(done):
+        if done:
             break
 
     env.close()

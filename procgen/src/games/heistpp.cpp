@@ -6,8 +6,8 @@
 #include "../cpp-utils.h"
 
 
-const int LOCKED_DOOR = 1;
-const int KEY = 2;
+const int KEY = 1;
+const int LOCKED_DOOR = 5;
 const int EXIT = 9;
 const int KEY_ON_RING = 11;
 const int WATER = 20;
@@ -30,6 +30,20 @@ class HeistPPGame : public BasicAbstractGame {
     float water_bonus;
     float action_bonus;
 
+    const std::map<int,uint8_t> asset_to_state = {
+      {SPACE, 0},
+      {KEY, 11},
+      {KEY+1, 12},
+      {KEY+2, 13},
+      {LOCKED_DOOR, 21},
+      {LOCKED_DOOR+1, 22},
+      {LOCKED_DOOR+2, 23},
+      {EXIT, 30},
+      {WATER, 41},
+      {FIRE, 42},
+      {WALL_OBJ, 50}
+    };
+
     HeistPPGame()
         : BasicAbstractGame() {
         maze_gen = nullptr;
@@ -42,6 +56,7 @@ class HeistPPGame : public BasicAbstractGame {
         visibility = 8.0;
 
         register_info_buffer("state");
+        register_obs_buffer("state");
 
         options.register_option<int32_t>("world_dim",5.0);
 
@@ -99,7 +114,6 @@ class HeistPPGame : public BasicAbstractGame {
 
     bool is_blocked_ents(const std::shared_ptr<Entity> &src, const std::shared_ptr<Entity> &target, bool is_horizontal) override {
         if (target->type == LOCKED_DOOR){
-            std::cout << "BLOCK:? " << target->image_theme << " " << has_keys[target->image_theme] << std::endl;
             return !has_keys[target->image_theme];
         }
 
@@ -293,6 +307,39 @@ class HeistPPGame : public BasicAbstractGame {
         }
     }
 
+
+    void write_state_to_buffer(uint8_t *ptr){
+      ptr[0] = int(agent->y) * main_width + int(agent->x);
+      for (int i =0; i < 3; i++){
+        ptr[i+1] = has_keys[i];
+      }
+
+      for (int i =0; i < 3; i++){
+        ptr[i+4] = 0;
+      }
+
+      for (int i = 0; i < grid_size; i++) {
+        ptr[i+7] = asset_to_state.at(get_obj(i));
+      }
+
+      uint8_t asset_subset = 0;
+      for (auto entity : entities){
+        asset_subset = 0;
+        if (entity->type == PLAYER){
+          continue;
+        }else if (entity->type == KEY_ON_RING){
+          continue;
+        }else if (entity->type == LOCKED_DOOR){
+          asset_subset = entity->image_theme;
+          ptr[4+asset_subset] = 1;
+        }else if (entity->type == KEY){
+          asset_subset = entity->image_theme;
+        }
+        auto i = int(entity->y) * main_width + int(entity->x);
+        ptr[i+7] = asset_to_state.at(entity->type+asset_subset);
+      }
+    }
+
     void game_step() override {
         BasicAbstractGame::game_step();
 
@@ -300,45 +347,17 @@ class HeistPPGame : public BasicAbstractGame {
 
         step_data.reward += action_bonus;
 
-        auto ptr = point_to_info<uint8_t>("state");
-        if (ptr != 0){
+        auto ptr_state_info = point_to_info<uint8_t>("state");
+        if (ptr_state_info != 0){
+          write_state_to_buffer(ptr_state_info);
+        }
 
-          ptr[0] = int(agent->y) * main_width + int(agent->x);
-          for (int i =0; i < 3; i++){
-            ptr[i+1] = has_keys[i];
-          }
-
-          for (int i =0; i < 3; i++){
-            ptr[i+4] = 0;
-          }
-
-          for (int i = 0; i < grid_size; i++) {
-            ptr[i+7] = get_obj(i);
-          }
-
-          for (auto entity : entities){
-            if (entity->type == PLAYER){
-              continue;
-            }else if (entity->type == KEY_ON_RING){
-              continue;
-            }else if (entity->type == LOCKED_DOOR){
-              ptr[4+entity->image_theme] = 1;
-            }
-            auto i = int(entity->y) * main_width + int(entity->x);
-            ptr[i+7] = entity->type;
-          }
-
+        auto ptr_state_obs = point_to_obs<uint8_t>("state");
+        if (ptr_state_obs != 0){
+          write_state_to_buffer(ptr_state_obs);
         }
 
     }
-
-    // void set_action_xy(int move_action) override {
-    //     BasicAbstractGame::set_action_xy(move_action);
-    //     if (grid_step){
-    //       if (action_vx != 0)
-    //           action_vy = 0;
-    //     }
-    // }
 
 
 };

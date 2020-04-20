@@ -51,6 +51,9 @@ Entity::Entity(float _x, float _y, float _vx, float _vy, float _r, int _type)
     : Entity(_x, _y, _vx, _vy, _r, _r, _type) {
 }
 
+Entity::~Entity(){
+}
+
 void Entity::step() {
     if (!smart_step) {
         x += vx;

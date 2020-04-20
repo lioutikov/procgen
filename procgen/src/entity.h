@@ -39,6 +39,8 @@ class Entity {
     Entity(float _x, float _y, float _dx, float _dy, float _rx, float _ry, int _type);
     Entity(float _x, float _y, float _dx, float _dy, float _r, int _type);
 
+    virtual ~Entity();
+
     virtual void step();
     bool should_erase();
     void face_direction(float dx, float dy, float rotation_offset = 0);

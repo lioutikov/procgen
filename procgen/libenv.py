@@ -164,7 +164,7 @@ class CVecEnv:
                 print(f"adding info space: {space}")
                 self._c_lib.libenv_add_space(self._c_env, self._c_lib.LIBENV_SPACES_INFO, space.to_libenv_space(self._ffi, self._c_lib) )
 
-        
+
         self.reward_range = (float("-inf"), float("inf"))
         self.spec = None
         self.num_envs = num_envs
@@ -172,7 +172,7 @@ class CVecEnv:
         self._action_space = self._get_spaces(self._c_lib.LIBENV_SPACES_ACTION)
         self._info_space = self._get_spaces(self._c_lib.LIBENV_SPACES_INFO)
         self._render_space = self._get_spaces(self._c_lib.LIBENV_SPACES_RENDER)
-        
+
         # allocate buffers
         self._observations, self._observation_buffers = self._allocate_dict_space(
             self.num_envs, self.observation_space
@@ -559,9 +559,7 @@ class CVecEnv:
     @staticmethod
     def _var_to_libenv(ffi, c_lib, var):
         _t, _v = (var, None) if (type(var) == type) else (type(var), var)
-        print(f"hmm... {_t} {_v}")
-
-
+        
         if issubclass(_t, bytes):
             dtype = c_lib.LIBENV_DTYPE_UINT8
             if _v is None:

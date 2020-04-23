@@ -7,6 +7,8 @@ from procgen import ProcgenEnv
 import argparse
 import numpy as np
 
+from procgen.recorder import Recorder
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vision", choices=["agent", "human"], default="human")
@@ -24,6 +26,22 @@ def main():
 
     world_dim = int(10)
     kwargs["additional_info_spaces"] = [ProcgenEnv.C_Space("state", False, (7+world_dim*world_dim,), bytes, (0,255))]
+    # SO FAR FOR HEISTPP ONLY!
+    # state[0] is the current cell_index of the agent.
+    # Compute coordinates: x,y = (cell_index % world_dim), (cell_index // world_dim)
+    #
+    # state[1:4] indicates if the agent has collected key 1,2,3 respectively.
+    # 0: not collected
+    # 1: collected
+    #
+    # state[5:7] indicates if the agent has opened door 1,2,3 respectively.
+    # 0: not opened
+    # 1: opened
+    #
+    # state[7:world_dim*world_dim+7] is the current world_map without the agent, collected keys and opened doors.
+    # check 'asset_to_state' map in 'heistpp.cpp' for the definition of each state value.
+
+
 
     kwargs["options"] = {
         'world_dim':world_dim,
@@ -39,17 +57,52 @@ def main():
         'action_bonus':-1.0,
         }
 
-    env = ProcgenEnv(num_envs=1, env_name="heistpp", **kwargs)
+    num_envs = 1
+    env = ProcgenEnv(num_envs=num_envs, env_name="heistpp", **kwargs)
+
+
+    # to start recording call the script with "--record-dir <your recdir>"
+    # we have a vector of environments and need a recorder for each one
+    recorders = []
+    if args.record_dir is not None:
+        for i_env in range(num_envs):
+            recorders.append(Recorder(args.record_dir, prefix=f"rand_{i_env:02d}"))
+            recorders[i_env].record_info_as("state","info_state")
+            recorders[i_env].record_obs_as("rgb","obs_rgb")
 
     obs = env.reset()
     step = 0
+    from pprint import pprint
+    for recorder in recorders:
+        recorder.new_recording()
     while True:
         env.render()
+
         obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
-        print(f"step {step} reward {rew} done {done}")
-        print(info[0]['state'])
+
+        # print("obs",type(obs),len(obs))
+        # pprint(obs.keys())
+        # pprint(obs['rgb'].shape)
+        # # print("rew")
+        # # pprint(rew)
+        # # print("done")
+        # # pprint(done)
+        # print("info")
+        # pprint(info)
+
+        image = env.render(mode="rgb_array")
+        image = image.reshape(image.shape[0],num_envs,-1,3)
+        # obs has to be restructered to be recorded...
+        rec_obs = [{k:v[i,...] for k,v in obs.items()} for i in range(num_envs)]
+        # pprint(rec_obs)
+
+        for i, recorder in enumerate(recorders):
+            recorder.new_entry(image[:,i,:,:], rec_obs[i], rew[i], done[i], info[i])
+
         step += 1
         if any(done):
+            for recorder in recorders:
+                recorder.close()
             break
 
     env.close()

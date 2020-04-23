@@ -17,7 +17,6 @@ import time
 import numpy as np
 from pyglet import gl
 from pyglet.window import key as keycodes
-import imageio
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,8 +52,7 @@ class Interactive(abc.ABC):
     """
 
     def __init__(self, env, sync=True, tps=60, aspect_ratio=None, display_info=False):
-        self._record_dir = None
-        self._movie_writer = None
+        self.recorder = None
         self._episode = 0
         self._display_info = display_info
         self._seconds_to_display_done_info = 0
@@ -156,12 +154,20 @@ class Interactive(abc.ABC):
 
         self._skip_info_out = []
         self._step_cbs = []
+        self._info_record_keys = {}
+        self._obs_record_keys = {}
 
     def skip_info_out(self, name):
         self._skip_info_out.append(name)
 
     def add_step_callback(self, cb):
         self._step_cbs.append(cb)
+
+    def record_obs_as(self,key,name):
+        self._obs_record_keys[key] = name
+
+    def record_info_as(self,key,name):
+        self._info_record_keys[key] = name
 
     def _update(self, dt):
         # if we're displaying done info, don't advance the simulation
@@ -210,11 +216,14 @@ class Interactive(abc.ABC):
 
                 if act is None:
                     act = 4
+
                 obs, rew, done, info = self._env.step(act)
+                print(obs, rew, done, info)
 
                 self._image = self.get_image(obs, self._env)
-                if self._movie_writer is not None:
-                    self._movie_writer.append_data(self._image)
+
+                if self.recorder is not None:
+                    self.recorder.new_entry(self._image, obs, rew, done, info)
 
                 self._episode_return += rew
                 self._steps += 1
@@ -259,8 +268,13 @@ class Interactive(abc.ABC):
                     self._episode_return = 0
                     self._prev_episode_return = 0
                     self._episode += 1
-                    if self._movie_writer is not None:
-                        self._restart_recording()
+
+                    if self.recorder is not None:
+                        self.recorder.new_recording(self._tps)
+
+                    # if self._movie_writer is not None:
+                    #     self._restart_recording()
+
                     if self._display_info:
                         self._seconds_to_display_done_info = SECONDS_TO_DISPLAY_DONE_INFO
 
@@ -318,16 +332,6 @@ class Interactive(abc.ABC):
         self._env.close()
         sys.exit(0)
 
-    def _restart_recording(self):
-        if self._movie_writer is not None:
-            self._movie_writer.close()
-
-        self._movie_writer = imageio.get_writer(
-            os.path.join(self._record_dir, f"{self._episode:03d}.mp4"),
-            fps=self._tps,
-            quality=9,
-        )
-
     @abc.abstractmethod
     def get_image(self, obs, env):
         """
@@ -343,14 +347,14 @@ class Interactive(abc.ABC):
         For async environments, keys is a list of keys currently held down
         """
 
-    def run(self, record_dir=None):
+    def run(self, record_dir=None, recorder = None):
         """
         Run the interactive window until the user quits
         """
-        self._record_dir = record_dir
-        if self._record_dir is not None:
-            os.makedirs(self._record_dir, exist_ok=True)
-            self._restart_recording()
+
+        if recorder is not None:
+            self.recorder = recorder
+            self.recorder.new_recording(self._tps)
 
         # pyglet.app.run() has issues like https://bitbucket.org/pyglet/pyglet/issues/199/attempting-to-resize-or-close-pyglet
         # and also involves inverting your code to run inside the pyglet framework

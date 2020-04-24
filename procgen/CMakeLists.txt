@@ -38,6 +38,9 @@ endif()
 
 if(UNIX)
   add_compile_options(-fdiagnostics-color=always)
+  # add_compile_options(-Werror -Wshadow)
+  # add_compile_options(-Werror -Wextra -Wall -Wformat=2 -Wundef -Wvla -Wmissing-include-dirs -Wnon-virtual-dtor -Wno-unused-parameter)
+  add_compile_options(-Werror -Wextra -Wshadow -Wall -Wformat=2 -Wundef -Wvla -Wmissing-include-dirs -Wnon-virtual-dtor -Wno-unused-parameter)
 endif()
 
 # find libenv.h header
@@ -58,7 +61,7 @@ add_library(env
   src/games/bigfish.cpp
   src/games/bossfight.cpp
   src/games/caveflyer.cpp
-#  src/games/collector.cpp
+  src/games/collector.cpp
   src/games/climber.cpp
   src/games/coinrun_old.cpp
   src/games/coinrun.cpp

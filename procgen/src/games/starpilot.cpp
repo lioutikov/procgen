@@ -111,9 +111,9 @@ class StarPilotGame : public BasicAbstractGame {
 
         float bg_k = 3;
         float t = cur_time;
-        float x_off = -t * scale * hp_slow_v * 2 / char_dim;
+        float xoff = -t * scale * hp_slow_v * 2 / char_dim;
 
-        QRectF r_bg = QRectF(x_off, -rect.height() * (bg_k - 1) / 2, rect.height() * bg_k * BG_RATIO, rect.height() * bg_k);
+        QRectF r_bg = QRectF(xoff, -rect.height() * (bg_k - 1) / 2, rect.height() * bg_k * BG_RATIO, rect.height() * bg_k);
         tile_image(p, main_bg_images_ptr->at(background_index).get(), r_bg, 1);
 
         draw_foreground(p, rect);
@@ -382,16 +382,16 @@ class StarPilotGame : public BasicAbstractGame {
         return type == FLYER || type == FAST_FLYER || type == TURRET || type == METEOR;
     }
 
-    bool should_fire(const std::shared_ptr<Entity> &e1, int cur_time) {
+    bool should_fire(const std::shared_ptr<Entity> &e1, int curr_time) {
         if (e1->fire_time <= 0) {
             return false;
         }
 
         if (e1->type == TURRET) {
-            return (cur_time - e1->spawn_time) % e1->fire_time == 0;
+            return (curr_time - e1->spawn_time) % e1->fire_time == 0;
         }
 
-        return cur_time - e1->spawn_time == e1->fire_time;
+        return curr_time - e1->spawn_time == e1->fire_time;
     }
 
     void game_step() override {
@@ -440,9 +440,9 @@ class StarPilotGame : public BasicAbstractGame {
 
             float vx = cos(theta) * v_scale;
             float vy = sin(theta) * v_scale;
-            float x_off = agent->rx * cos(theta);
+            float xoff = agent->rx * cos(theta);
 
-            auto bullet = std::make_shared<Entity>(agent->x + x_off, agent->y, vx, vy, bullet_r, BULLET_PLAYER);
+            auto bullet = std::make_shared<Entity>(agent->x + xoff, agent->y, vx, vy, bullet_r, BULLET_PLAYER);
             bullet->collides_with_entities = true;
             bullet->face_direction(vx, vy);
             bullet->rotation -= PI / 2;

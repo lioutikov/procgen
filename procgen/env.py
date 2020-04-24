@@ -12,7 +12,7 @@ ENV_NAMES = [
     "bossfight",
     "caveflyer",
     "chaser",
-#    "collector",
+   "collector",
     "climber",
     "coinrun",
     "dodgeball",

@@ -42,7 +42,7 @@ class BasicAbstractGame : public Game {
     virtual void draw_grid_obj(QPainter &p, const QRectF &rect, int obj);
     virtual void choose_world_dim();
     virtual bool should_draw_entity(const std::shared_ptr<Entity> &entity);
-    virtual void set_action_xy(int move_action);
+    virtual void set_action_xy(int move_act);
     virtual void choose_center(float &cx, float &cy);
     virtual void update_agent_velocity();
     virtual QRectF get_adjusted_image_rect(int type, const QRectF &rect);

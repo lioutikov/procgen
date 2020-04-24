@@ -10,8 +10,8 @@ Cellular-automata based room generation
 
 class RoomGenerator {
   public:
-    RoomGenerator(BasicAbstractGame *game)
-        : game(game){};
+    RoomGenerator(BasicAbstractGame *_game)
+        : game(_game){};
 
     void update();
     void find_path(int src, int dst, std::vector<int> &path);

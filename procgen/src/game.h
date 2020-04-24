@@ -54,7 +54,7 @@ struct GameOption : public GameOptionBase {
   std::unique_ptr<T[]> data;
   const uint32_t size;
 
-  GameOption(const uint32_t size): size(size) {
+  GameOption(const uint32_t _size): size(_size) {
     if constexpr (std::is_same_v<T,uint8_t>){
       dtype = LIBENV_DTYPE_UINT8;
     }else if constexpr (std::is_same_v<T,int32_t>){

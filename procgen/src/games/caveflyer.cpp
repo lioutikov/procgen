@@ -263,8 +263,8 @@ class CaveFlyerGame : public BasicAbstractGame {
         visibility = options.distribution_mode == EasyMode ? 10 : 16;
     }
 
-    void set_action_xy(int move_action) override {
-        float acceleration = move_action % 3 - 1;
+    void set_action_xy(int move_act) override {
+        float acceleration = move_act % 3 - 1;
         if (acceleration < 0)
             acceleration *= 0.33f;
 
@@ -280,7 +280,7 @@ class CaveFlyerGame : public BasicAbstractGame {
 
         action_vy = acceleration * sin(theta);
         action_vx = acceleration * cos(theta);
-        action_vrot = move_action / 3 - 1;
+        action_vrot = move_act / 3 - 1;
     }
 
     void game_step() override {

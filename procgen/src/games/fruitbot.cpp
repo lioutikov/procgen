@@ -150,9 +150,9 @@ class FruitBotGame : public BasicAbstractGame {
         main_height = 60;
     }
 
-    void set_action_xy(int move_action) override {
-        action_vx = move_action / 3 - 1;
-        action_vy = 0.2f; //(move_action % 3) * .2;
+    void set_action_xy(int move_act) override {
+        action_vx = move_act / 3 - 1;
+        action_vy = 0.2f; //(move_act % 3) * .2;
         action_vrot = 0;
     }
 

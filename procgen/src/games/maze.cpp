@@ -93,8 +93,8 @@ class MazeGame : public BasicAbstractGame {
         }
     }
 
-    void set_action_xy(int move_action) override {
-        BasicAbstractGame::set_action_xy(move_action);
+    void set_action_xy(int move_act) override {
+        BasicAbstractGame::set_action_xy(move_act);
         if (action_vx != 0)
             action_vy = 0;
     }

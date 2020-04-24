@@ -72,19 +72,19 @@ void Game::parse_options(std::string name, VecOptions opts) {
     opts.consume_int("game_type", &game_type);
 
 
-    for (auto name : opts.get_names()){
-      if (options.exists<uint8_t>(name)){
+    for (auto opt_name : opts.get_names()){
+      if (options.exists<uint8_t>(opt_name)){
         bool dummy;
-        opts.consume_bool(name, &dummy);
-        options.assign<uint8_t>(name, dummy);
-      }else if (options.exists<int32_t>(name)){
+        opts.consume_bool(opt_name, &dummy);
+        options.assign<uint8_t>(opt_name, dummy);
+      }else if (options.exists<int32_t>(opt_name)){
         int dummy;
-        opts.consume_int(name, &dummy);
-        options.assign<int32_t>(name, dummy);
-      }else if (options.exists<float>(name)){
+        opts.consume_int(opt_name, &dummy);
+        options.assign<int32_t>(opt_name, dummy);
+      }else if (options.exists<float>(opt_name)){
         float dummy;
-        opts.consume_float(name, &dummy);
-        options.assign<float>(name, dummy);
+        opts.consume_float(opt_name, &dummy);
+        options.assign<float>(opt_name, dummy);
       }
     }
 
@@ -193,7 +193,7 @@ void Game::register_obs_buffer(std::string name){
 }
 
 void Game::connect_buffer(std::map<std::string, GameSpaceBuffer> &buffer_map, const std::vector<struct libenv_space> &spaces, const std::vector<void *> &buffer){
-  for (int i = 0 ; i < spaces.size(); i++){
+  for (uint32_t i = 0 ; i < spaces.size(); i++){
     auto bptr = buffer_map.find(spaces[i].name);
     if (bptr == buffer_map.end()){
       printf("No in-game buffer registerd for space '%s'\n", spaces[i].name);

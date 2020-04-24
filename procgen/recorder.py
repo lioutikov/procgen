@@ -60,12 +60,14 @@ class Recorder():
 
     def new_recording(self, tps=None, counter = None):
 
+
+        self.close()
+
         if tps is None:
             tps=60
 
         self._counter = self._counter+1 if counter is None else counter
 
-        self.close()
 
         if self._record_image:
             self._movie_writer = imageio.get_writer(
@@ -85,16 +87,16 @@ class Recorder():
     def new_entry(self, image, obs, rew, done, info):
 
         if self._record_image:
-            self._movie_writer.append_data(image)
+            self._movie_writer.append_data(np.array(image))
 
         if self._record_rew:
-            self._data["reward"].append(rew)
+            self._data["reward"].append(np.array(rew))
 
         if self._record_done:
-            self._data["done"].append(done)
+            self._data["done"].append(np.array(done))
 
         for name_data, (name_obs, transform) in self._obs_map.items():
-            self._data[name_data].append(transform(obs[name_obs]))
+            self._data[name_data].append(transform(np.array(obs[name_obs])))
 
         for name_data, (name_info, transform) in self._info_map.items():
-            self._data[name_data].append(transform(info[name_info]))
+            self._data[name_data].append(transform(np.array(info[name_info])))

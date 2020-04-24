@@ -72,7 +72,7 @@ def main():
 
     obs = env.reset()
     step = 0
-    from pprint import pprint
+
     for recorder in recorders:
         recorder.new_recording()
     while True:
@@ -80,21 +80,11 @@ def main():
 
         obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
 
-        # print("obs",type(obs),len(obs))
-        # pprint(obs.keys())
-        # pprint(obs['rgb'].shape)
-        # # print("rew")
-        # # pprint(rew)
-        # # print("done")
-        # # pprint(done)
-        # print("info")
-        # pprint(info)
-
         image = env.render(mode="rgb_array")
         image = image.reshape(image.shape[0],num_envs,-1,3)
+
         # obs has to be restructered to be recorded...
         rec_obs = [{k:v[i,...] for k,v in obs.items()} for i in range(num_envs)]
-        # pprint(rec_obs)
 
         for i, recorder in enumerate(recorders):
             recorder.new_entry(image[:,i,:,:], rec_obs[i], rew[i], done[i], info[i])

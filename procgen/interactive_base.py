@@ -218,8 +218,7 @@ class Interactive(abc.ABC):
                     act = 4
 
                 obs, rew, done, info = self._env.step(act)
-                print(obs, rew, done, info)
-
+                
                 self._image = self.get_image(obs, self._env)
 
                 if self.recorder is not None:

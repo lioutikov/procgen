@@ -39,6 +39,16 @@ void VecOptions::consume_float(std::string name, float *value) {
     *value = *(float *)(opt.data);
 }
 
+void VecOptions::consume_int_vector(std::string name, std::vector<int> &vec){
+  auto opt = find_option(name, LIBENV_DTYPE_INT32);
+  if (opt.data == nullptr) {
+      return;
+  }
+  for (int i = 0; i < opt.count; i++ ){
+    vec.push_back(((int *)opt.data)[i]);
+  }
+}
+
 void VecOptions::ensure_empty() {
     if (m_options.size() > 0) {
         fatal("unused options found, first unused option: %s\n", m_options[0].name);

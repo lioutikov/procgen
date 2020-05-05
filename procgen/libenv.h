@@ -192,6 +192,9 @@ LIBENV_API void libenv_close(libenv_venv *handle);
 
 LIBENV_API int libenv_add_space(libenv_venv *handle, enum libenv_spaces_name name, struct libenv_space *sp);
 
+LIBENV_API int libenv_are_games_finished(libenv_venv *handle, bool *finished_games);
+
+
 #endif
 
 // END_CDEF

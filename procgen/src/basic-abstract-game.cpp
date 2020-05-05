@@ -1080,9 +1080,13 @@ float BasicAbstractGame::rand_pos(float r, float max) {
     return rand_pos(r, 0, max);
 }
 
-bool BasicAbstractGame::has_any_collision(const std::shared_ptr<Entity> &e1, float margin) {
+bool BasicAbstractGame::has_any_collision(const std::shared_ptr<Entity> &e1, float margin, bool exclude_self) {
     for (int i = (int)(entities.size()) - 1; i >= 0; i--) {
         auto ent = entities.at(i);
+
+        if (exclude_self && (e1 == ent)){
+          continue;
+        }
 
         if (!ent->avoids_collisions && has_collision(e1, ent, margin)) {
             return true;

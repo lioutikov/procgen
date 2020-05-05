@@ -218,11 +218,11 @@ class Interactive(abc.ABC):
                     act = 4
 
                 obs, rew, done, info = self._env.step(act)
-                
+
                 self._image = self.get_image(obs, self._env)
 
                 if self.recorder is not None:
-                    self.recorder.new_entry(self._image, obs, rew, done, info)
+                    self.recorder.new_entry(self._image, obs, rew, done, info, act)
 
                 self._episode_return += rew
                 self._steps += 1
@@ -269,7 +269,7 @@ class Interactive(abc.ABC):
                     self._episode += 1
 
                     if self.recorder is not None:
-                        self.recorder.new_recording(self._tps)
+                        self.recorder.new_recording()
 
                     # if self._movie_writer is not None:
                     #     self._restart_recording()
@@ -353,7 +353,7 @@ class Interactive(abc.ABC):
 
         if recorder is not None:
             self.recorder = recorder
-            self.recorder.new_recording(self._tps)
+            self.recorder.new_recording()
 
         # pyglet.app.run() has issues like https://bitbucket.org/pyglet/pyglet/issues/199/attempting-to-resize-or-close-pyglet
         # and also involves inverting your code to run inside the pyglet framework

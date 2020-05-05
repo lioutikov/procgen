@@ -309,6 +309,8 @@ class Game {
       return point_to_buffer<T>(obs_buffers, name);
     }
 
+    int num_resets();
+
   private:
     int reset_count = 0;
     float total_reward = 0.0f;

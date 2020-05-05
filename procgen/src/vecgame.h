@@ -23,6 +23,7 @@ class VecGame {
     std::vector<struct libenv_space> action_spaces;
     std::vector<struct libenv_space> render_spaces;
     std::vector<struct libenv_space> info_spaces;
+    std::vector<bool> finished_games;
 
     int num_envs;
     int num_joint_games;
@@ -50,6 +51,7 @@ class VecGame {
     std::condition_variable pending_games_added;
     std::condition_variable pending_game_complete;
     std::vector<std::thread> threads;
+    std::vector<int> max_runs_per_game;
     bool time_to_die = false;
     bool first_reset = true;
     void wait_for_stepping_threads();

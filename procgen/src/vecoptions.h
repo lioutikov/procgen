@@ -19,6 +19,7 @@ class VecOptions {
     void consume_int(std::string name, int32_t *value);
     void consume_bool(std::string name, bool *value);
     void consume_float(std::string name, float *value);
+    void consume_int_vector(std::string name, std::vector<int> &vec);
     void ensure_empty();
 
     std::vector<std::string> get_names();

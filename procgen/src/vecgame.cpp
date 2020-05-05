@@ -43,6 +43,16 @@ libenv_venv *libenv_make(int num_envs, const struct libenv_options options) {
     return (libenv_venv *)(venv);
 }
 
+int libenv_are_games_finished(libenv_venv *env, bool *finished_games){
+  auto venv = (VecGame *)(env);
+  if (finished_games != nullptr) {
+    for (size_t i = 0; i < venv->finished_games.size(); i++ ){
+      finished_games[i] = venv->finished_games[i];
+    }
+  }
+  return venv->finished_games.size();
+}
+
 int libenv_get_spaces(libenv_venv *env, enum libenv_spaces_name name,
                       struct libenv_space *out_spaces) {
     auto venv = (VecGame *)(env);
@@ -192,6 +202,7 @@ VecGame::VecGame(int _nenvs, VecOptions opts) {
     opts.consume_int("rand_seed", &rand_seed);
     opts.consume_int("num_threads", &num_threads);
     opts.consume_string("resource_root", &resource_root);
+    opts.consume_int_vector("max_runs_per_game", max_runs_per_game);
 
     std::call_once(global_init_flag, global_init, rand_seed,
                    resource_root);
@@ -253,6 +264,8 @@ VecGame::VecGame(int _nenvs, VecOptions opts) {
 
         games[n]->game_init();
         games[n]->reset();
+
+        finished_games.push_back(false);
     }
 
     {
@@ -370,6 +383,10 @@ void VecGame::step_async(const std::vector<int32_t> &acts,
 
         for (int e = 0; e < num_envs; e++) {
             const auto &game = games[e];
+            if ((max_runs_per_game[e] > 0) &&  (game->num_resets() > max_runs_per_game[e])){
+              finished_games[e] = true;
+              continue;
+            }
             game->action = acts[e];
             game->obs_bufs = obs[e];
             game->info_bufs = infos[e];

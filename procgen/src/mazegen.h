@@ -19,10 +19,11 @@ class MazeGen {
 
     MazeGen(RandGen *_rand_gen, int _maze_dim);
     void generate_maze();
+    void generate_maze(int start, int end);
     void generate_maze_no_dead_ends();
     void generate_maze_with_doors(int num_doors);
+    // void generate_maze_with_doors(int num_doors, int start, int end);
     void place_objects(int start_obj, int num_objs);
-
   private:
     RandGen *rand_gen;
     int maze_dim;
@@ -36,6 +37,7 @@ class MazeGen {
 
     void get_neighbors(int idx, int type, std::vector<int> &neighbors);
     int lookup(int x, int y);
+
     void set_free_cell(int x, int y);
     void set_obj(int idx, int type);
     int to_index(int x, int y);

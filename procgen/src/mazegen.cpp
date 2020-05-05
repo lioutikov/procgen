@@ -2,6 +2,9 @@
 #include "object-ids.h"
 #include "cpp-utils.h"
 
+
+#include <iostream>
+
 struct Wall {
     int x1;
     int y1;
@@ -185,6 +188,197 @@ void MazeGen::generate_maze() {
         walls.erase(walls.begin() + n);
     }
 }
+
+
+
+void MazeGen::generate_maze(int start, int end) {
+
+    std::cout << "Not yet supported " << std::endl;
+    fassert(false);
+
+    // fassert((start != end) || (start == -1));
+
+    int start_x = (start % maze_dim);
+    int start_y = (start / maze_dim);
+    int end_x = (end % maze_dim);
+    int end_y = (end / maze_dim);
+
+    for (int i = 0; i < array_dim; i++) {
+        for (int j = 0; j < array_dim; j++) {
+            grid.set(i, j, WALL_OBJ);
+        }
+    }
+
+    // grid.set(MAZE_OFFSET, MAZE_OFFSET, 0);
+
+    std::vector<Wall> walls;
+
+    num_free_cells = 0;
+    free_cell_set.clear();
+
+    std::set<int> *s0 = &cell_sets[0];
+    s0->clear();
+    s0->insert(0);
+    cell_sets_idxs[0] = 0;
+
+    for (int i = 1; i < maze_dim * maze_dim; i++) {
+        std::set<int> *s1 = &cell_sets[i];
+        s1->clear();
+        s1->insert(i);
+        cell_sets_idxs[i] = i;
+    }
+
+    int x_offset = start_x % 2;
+    int y_offset = end_y % 2;
+
+
+    for (int i = 1-x_offset; i < maze_dim; i += 2) {
+        for (int j = y_offset; j < maze_dim; j += 2) {
+            if (i > 0 && i < maze_dim - 1) {
+                walls.push_back(Wall({i - 1, j, i + 1, j}));
+            }
+        }
+    }
+
+    for (int i = x_offset; i < maze_dim; i += 2) {
+        for (int j = 1-y_offset; j < maze_dim; j += 2) {
+            if (j > 0 && j < maze_dim - 1) {
+                walls.push_back(Wall({i, j - 1, i, j + 1}));
+            }
+        }
+    }
+
+    bool freed_start = false;
+    bool freed_end = false;
+    int r_offset = rand_gen->randn(walls.size());
+    while( (!freed_start) || (!freed_end) ){
+      r_offset = (r_offset+1) % walls.size();
+      // std::cout << "njdnj" << r_off << " " << walls.size() << '\n';
+      Wall wall = walls[r_offset];
+      bool found = false;
+      if (
+        (!freed_start) &&
+        (wall.x1 <= start_x) &&
+        (start_x <= wall.x2) &&
+        (wall.y1 <= start_y) &&
+        (start_y <= wall.y2)
+      ){
+        freed_start = true;
+        found = true;
+      }
+
+      if (
+        (!freed_end) &&
+        (wall.x1 <= end_x) &&
+        (end_x <= wall.x2) &&
+        (wall.y1 <= end_y) &&
+        (end_y <= wall.y2)
+      ){
+        freed_end = true;
+        found = true;
+      }
+
+      if (found){
+        int s0_idx = lookup(wall.x1, wall.y1);
+        s0 = &cell_sets[s0_idx];
+        int s1_idx = lookup(wall.x2, wall.y2);
+        std::set<int> *s1 = &cell_sets[s1_idx];
+        int x0 = (wall.x1 + wall.x2) / 2;
+        int y0 = (wall.y1 + wall.y2) / 2;
+        int center = maze_dim * y0 + x0;
+
+        set_free_cell(wall.x1, wall.y1);
+        set_free_cell(x0, y0);
+        set_free_cell(wall.x2, wall.y2);
+        s1->insert(s0->begin(), s0->end());
+        s1->insert(center);
+
+        std::set<int>::iterator it;
+        for (it = s1->begin(); it != s1->end(); ++it) {
+            cell_sets_idxs[*it] = s1_idx;
+        }
+
+        walls.erase(walls.begin() + r_offset);
+      }
+    }
+
+    while (walls.size() > 0) {
+        int n = rand_gen->randn((int)(walls.size()));
+        Wall wall = walls[n];
+
+        int s0_idx = lookup(wall.x1, wall.y1);
+        s0 = &cell_sets[s0_idx];
+        int s1_idx = lookup(wall.x2, wall.y2);
+        std::set<int> *s1 = &cell_sets[s1_idx];
+
+        int x0 = (wall.x1 + wall.x2) / 2;
+        int y0 = (wall.y1 + wall.y2) / 2;
+        int center = maze_dim * y0 + x0;
+
+        bool can_remove =
+            (grid.get(x0 + MAZE_OFFSET, y0 + MAZE_OFFSET) == WALL_OBJ) &&
+            (s0_idx != s1_idx);
+
+        if (can_remove) {
+            set_free_cell(wall.x1, wall.y1);
+            set_free_cell(x0, y0);
+            set_free_cell(wall.x2, wall.y2);
+
+            s1->insert(s0->begin(), s0->end());
+            s1->insert(center);
+
+            std::set<int>::iterator it;
+            for (it = s1->begin(); it != s1->end(); ++it) {
+                cell_sets_idxs[*it] = s1_idx;
+            }
+        }
+
+        walls.erase(walls.begin() + n);
+    }
+
+    for(int i=0; i<maze_dim; i++){
+      if (
+        (grid.get(i + MAZE_OFFSET, maze_dim-1 + MAZE_OFFSET) == WALL_OBJ ) &&
+        ((i == 0) || (grid.get(i-1 + MAZE_OFFSET, maze_dim-1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((i == maze_dim-1) || (grid.get(i+1 + MAZE_OFFSET, maze_dim-1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((grid.get(i + MAZE_OFFSET, maze_dim-2 + MAZE_OFFSET) != WALL_OBJ)) &&
+        (rand_gen->randn(2))
+      ){
+        set_free_cell(i, maze_dim-1);
+      }
+
+      if (
+        (grid.get(i + MAZE_OFFSET, 0 + MAZE_OFFSET) == WALL_OBJ ) &&
+        ((i == 0) || (grid.get(i-1 + MAZE_OFFSET, 0 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((i == maze_dim-1) || (grid.get(i+1 + MAZE_OFFSET, 0 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((grid.get(i + MAZE_OFFSET, 1 + MAZE_OFFSET) != WALL_OBJ)) &&
+        (rand_gen->randn(2))
+      ){
+        set_free_cell(i, 0);
+      }
+
+      if (
+        (grid.get(maze_dim-1 + MAZE_OFFSET, i + MAZE_OFFSET) == WALL_OBJ ) &&
+        ((i == 0) || (grid.get(maze_dim-1 + MAZE_OFFSET, i-1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((i == maze_dim-1) || (grid.get(maze_dim-1 + MAZE_OFFSET, i+1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((grid.get(maze_dim-2 + MAZE_OFFSET, i + MAZE_OFFSET) != WALL_OBJ)) &&
+        (rand_gen->randn(2))
+      ){
+        set_free_cell(maze_dim-1, i);
+      }
+
+      if (
+        (grid.get(0 + MAZE_OFFSET, i + MAZE_OFFSET) == WALL_OBJ ) &&
+        ((i == 0) || (grid.get(0 + MAZE_OFFSET, i-1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((i == maze_dim-1) || (grid.get(0 + MAZE_OFFSET, i+1 + MAZE_OFFSET) == WALL_OBJ)) &&
+        ((grid.get(1 + MAZE_OFFSET, i + MAZE_OFFSET) != WALL_OBJ)) &&
+        (rand_gen->randn(2))
+      ){
+        set_free_cell(0, i);
+      }
+    }
+}
+
 
 // Generate a maze that has no dead ends. Approximates a MsPacman style maze.
 void MazeGen::generate_maze_no_dead_ends() {

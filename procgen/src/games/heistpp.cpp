@@ -5,7 +5,6 @@
 #include "../mazegen.h"
 #include "../cpp-utils.h"
 
-
 const int KEY = 1;
 const int LOCKED_DOOR = 5;
 const int EXIT = 9;
@@ -14,6 +13,10 @@ const int WATER = 20;
 const int FIRE = 21;
 
 class HeistPPGame : public BasicAbstractGame {
+
+
+    RandGen placement_rand_gen;
+
   public:
     std::shared_ptr<MazeGen> maze_gen;
     int world_dim, num_keys, num_doors;
@@ -73,6 +76,9 @@ class HeistPPGame : public BasicAbstractGame {
         options.register_option<float>("fire_bonus",-5.0);
         options.register_option<float>("water_bonus",-2.0);
         options.register_option<float>("action_bonus",-1.0);
+        options.register_option<int32_t>("agent_cell",-1);
+        options.register_option<int32_t>("diamond_cell",-1);
+        options.register_option<int32_t>("placement_seed",11);
     }
 
     void load_background_images() override {
@@ -202,6 +208,8 @@ class HeistPPGame : public BasicAbstractGame {
       fire_bonus = options.get<float>("fire_bonus");
       water_bonus = options.get<float>("water_bonus");
       action_bonus = options.get<float>("action_bonus");
+
+      placement_rand_gen.seed(options.get<float>("placement_seed"));
     }
 
     void game_reset() override {
@@ -226,8 +234,16 @@ class HeistPPGame : public BasicAbstractGame {
 
         float r_ent = maze_scale / 2;
 
+
+        int agent_cell = options.get<int32_t>("agent_cell");
+        int diamond_cell = options.get<int32_t>("diamond_cell");
+
+
         maze_gen = std::make_shared<MazeGen>(&rand_gen, maze_dim);
-        maze_gen->generate_maze_with_doors(num_keys);
+        // maze_gen->generate_maze_with_doors(num_keys);
+        // maze_gen->generate_maze(agent_cell,diamond_cell);
+        maze_gen->generate_maze();
+
 
         // move agent out of the way for maze generation
         agent->x = -1;
@@ -240,6 +256,8 @@ class HeistPPGame : public BasicAbstractGame {
           set_obj(i, WALL_OBJ);
         }
 
+        std::pair<float, float> agent_pos(-1.0,-1.0);
+        std::pair<float, float> diamond_pos(-1.0,-1.0);
 
         int num_placed_doors = 0;
         for (int i = 0; i < maze_dim; i++) {
@@ -263,7 +281,8 @@ class HeistPPGame : public BasicAbstractGame {
                     auto ent = add_entity(x + .5, y + .5, 0, 0, .5, WATER);
                   }else if (chance < fire_chance){
                     set_obj(x, y, SPACE);
-                    auto ent = add_entity(x + .5, y + .5, 0, 0, .5, FIRE);
+                    auto ent = add_entity(x + .5, y + .5, 0, 0
+                      , .5, FIRE);
                   }else{
                     set_obj(x, y, SPACE);
                   }
@@ -286,14 +305,79 @@ class HeistPPGame : public BasicAbstractGame {
                       num_placed_doors++;
                     }
                 } else if (obj == EXIT_OBJ) {
-                    auto ent = spawn_entity(.375 * maze_scale, EXIT, maze_scale * x, maze_scale * y, maze_scale, maze_scale);
-                    match_aspect_ratio(ent);
+                    diamond_pos.first = x+0.5;
+                    diamond_pos.second = y+0.5;
                 } else if (obj == AGENT_OBJ) {
-                    agent->x = obj_x;
-                    agent->y = obj_y;
+                  agent_pos.first = obj_x;
+                  agent_pos.second = obj_y;
                 }
             }
         }
+
+
+        if (agent_cell == -1){
+          agent->x = agent_pos.first;
+          agent->y = agent_pos.second;
+        }else if (agent_cell == -2){
+          int i_rand  = placement_rand_gen.randn(grid_size);
+          for(int i = 0; i < grid_size; i++){
+              int cell = i+i_rand % grid_size;
+              if(get_obj(cell) != SPACE){
+                continue;
+              }
+              agent->x = (cell % main_width) + .5;
+              agent->y = (cell / main_width) + .5;
+              if(has_any_collision(agent,0,true)){
+                continue;
+              }
+              break;
+          }
+        }else{
+          fassert(agent_cell >= 0);
+          fassert(agent_cell < grid_size);
+
+          fassert(get_obj(agent_cell) == SPACE);
+
+          agent->x = (agent_cell % main_width) + .5;
+          agent->y = (agent_cell / main_width) + .5;
+
+          fassert(!has_any_collision(agent,0,true));
+        }
+
+
+        auto diamond = spawn_entity(.375 * maze_scale, EXIT, diamond_pos.first, diamond_pos.second, maze_scale, maze_scale);
+        match_aspect_ratio(diamond);
+
+        if (diamond_cell == -1){
+          diamond->x = diamond_pos.first;
+          diamond->y = diamond_pos.second;
+        }else if (diamond_cell == -2){
+          int i_rand  = placement_rand_gen.randn(grid_size);
+          for(int i = 0; i < grid_size; i++){
+              int cell = i+i_rand % grid_size;
+              if(get_obj(cell) != SPACE){
+                continue;
+              }
+              diamond->x = (cell % main_width) + .5;
+              diamond->y = (cell / main_width) + .5;
+              if(has_any_collision(diamond,0,true)){
+                continue;
+              }
+              break;
+          }
+        }else{
+          fassert(diamond_cell >= 0);
+          fassert(diamond_cell < grid_size);
+
+          fassert(get_obj(diamond_cell) == SPACE);
+
+          diamond->x = (diamond_cell % main_width) + .5;
+          diamond->y = (diamond_cell / main_width) + .5;
+
+          fassert(!has_any_collision(diamond,0,true));
+        }
+
+
 
         float ring_key_r = 0.03f;
 

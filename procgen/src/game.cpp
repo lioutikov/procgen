@@ -107,6 +107,10 @@ void Game::render_to_buf(void *dst, int w, int h, bool antialias) {
     game_draw(p, rect);
 }
 
+int Game::num_resets(){
+  return reset_count;
+}
+
 void Game::reset() {
     reset_count++;
 

@@ -81,6 +81,7 @@ class BaseProcgenEnv(CVecEnv):
         num_threads=4,
         additional_info_spaces = None,
         additional_obs_spaces = None,
+        max_runs_per_game = None,
     ):
         if resource_root is None:
             resource_root = os.path.join(SCRIPT_DIR, "data", "assets") + os.sep
@@ -99,6 +100,15 @@ class BaseProcgenEnv(CVecEnv):
         if rand_seed is None:
             rand_seed = create_random_seed()
 
+        if max_runs_per_game is None:
+            max_runs_per_game = np.zeros(num_envs,dtype=np.int32)
+        elif isinstance(max_runs_per_game,(tuple,list,set,np.ndarray)):
+            max_runs_per_game = np.array(max_runs_per_game,dtype=np.int32).flatten()
+        else:
+            max_runs_per_game = np.repeat(np.array(max_runs_per_game,dtype=np.int32),num_envs)
+
+        assert max_runs_per_game.size == num_envs
+
         options.update(
             {
                 "env_name": env_name,
@@ -111,6 +121,7 @@ class BaseProcgenEnv(CVecEnv):
                 "num_threads": num_threads,
                 # these will only be used the first time an environment is created in a process
                 "resource_root": resource_root,
+                "max_runs_per_game": max_runs_per_game,
             }
         )
 

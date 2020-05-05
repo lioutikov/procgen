@@ -559,7 +559,7 @@ class CVecEnv:
     @staticmethod
     def _var_to_libenv(ffi, c_lib, var):
         _t, _v = (var, None) if (type(var) == type) else (type(var), var)
-        
+
         if issubclass(_t, bytes):
             dtype = c_lib.LIBENV_DTYPE_UINT8
             if _v is None:
@@ -607,7 +607,19 @@ class CVecEnv:
 
     @staticmethod
     def _var_from_libenv():
-        pass
+        raise NotImplementedEroor()
+
+    def are_games_finished(self):
+
+        count = self._c_lib.libenv_are_games_finished(self._c_env, self._ffi.NULL)
+        if count == 0:
+            return np.array([],dtype=np.bool)
+
+        finished_games = np.full(count, False, dtype=np.bool)
+        cffi_arr = self._ffi.cast('bool*', finished_games.ctypes.data)
+        self._c_lib.libenv_are_games_finished(self._c_env, cffi_arr)
+        return finished_games
+
 
     def get_images(self) -> np.ndarray:
         """

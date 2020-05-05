@@ -82,7 +82,7 @@ class BasicAbstractGame : public Game {
 
     float rand_pos(float r, float max);
     float rand_pos(float r, float min, float max);
-    bool has_any_collision(const std::shared_ptr<Entity> &e1, float margin = 0);
+    bool has_any_collision(const std::shared_ptr<Entity> &e1, float margin = 0, bool exclude_self = false);
     bool has_agent_collision(const std::shared_ptr<Entity> &e1);
     bool has_collision(const std::shared_ptr<Entity> &e1, const std::shared_ptr<Entity> &e2, float margin = 0);
     bool is_out_of_bounds(const std::shared_ptr<Entity> &e1);

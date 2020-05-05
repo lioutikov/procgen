@@ -7,7 +7,7 @@ from procgen import ProcgenEnv
 import argparse
 import numpy as np
 
-from procgen.recorder import Recorder
+from procgen.recorder import VecRecorder
 
 def main():
     parser = argparse.ArgumentParser()
@@ -22,7 +22,11 @@ def main():
     kwargs["use_generated_assets"] = True if (args.use_generated_assets == "yes") else False
     if args.level_seed is not None:
         kwargs["start_level"] = args.level_seed
+        level_seed = args.level_seed
         kwargs["num_levels"] = 1
+    else:
+        level_seed = ''
+
 
     world_dim = int(10)
     kwargs["additional_info_spaces"] = [ProcgenEnv.C_Space("state", False, (7+world_dim*world_dim,), bytes, (0,255))]
@@ -57,42 +61,37 @@ def main():
         'action_bonus':-1.0,
         }
 
-    num_envs = 1
+    num_envs = 10
     env = ProcgenEnv(num_envs=num_envs, env_name="heistpp", **kwargs)
 
 
     # to start recording call the script with "--record-dir <your recdir>"
     # we have a vector of environments and need a recorder for each one
-    recorders = []
+    recorder = None
     if args.record_dir is not None:
-        for i_env in range(num_envs):
-            recorders.append(Recorder(args.record_dir, prefix=f"rand_{i_env:02d}"))
-            recorders[i_env].record_info_as("state","info_state")
-            recorders[i_env].record_obs_as("rgb","obs_rgb")
+        recorder = VecRecorder(args.record_dir, prefix=f"rand_")
+        recorder.record_info_as("state","info_state")
+        recorder.record_obs_as("rgb","obs_rgb")
+        recorder.new_recording(np.arange(num_envs))
 
     obs = env.reset()
     step = 0
 
-    for recorder in recorders:
-        recorder.new_recording()
     while True:
         env.render()
 
-        obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
+        action = np.array([env.action_space.sample() for _ in range(num_envs)])
+        obs, rew, done, info = env.step(action)
+        finished_games = env.are_games_finished()
 
-        image = env.render(mode="rgb_array")
-        image = image.reshape(image.shape[0],num_envs,-1,3)
+        if recorder is not None:
+            renders = env.render(mode="rgb_array")
+            recorder.new_entry(render=renders, obs=obs, rew=rew, done=done, info=info, action=action)
+            recorder.new_recording(done & ~finished_games)
 
-        # obs has to be restructered to be recorded...
-        rec_obs = [{k:v[i,...] for k,v in obs.items()} for i in range(num_envs)]
-
-        for i, recorder in enumerate(recorders):
-            recorder.new_entry(image[:,i,:,:], rec_obs[i], rew[i], done[i], info[i])
 
         step += 1
-        if any(done):
-            for recorder in recorders:
-                recorder.close()
+        if all(finished_games):
             break
 
     env.close()

@@ -240,9 +240,9 @@ class HeistPPGame : public BasicAbstractGame {
 
 
         maze_gen = std::make_shared<MazeGen>(&rand_gen, maze_dim);
-        // maze_gen->generate_maze_with_doors(num_keys);
+        maze_gen->generate_maze_with_doors(num_keys);
         // maze_gen->generate_maze(agent_cell,diamond_cell);
-        maze_gen->generate_maze();
+        // maze_gen->generate_maze();
 
 
         // move agent out of the way for maze generation

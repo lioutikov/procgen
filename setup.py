@@ -77,7 +77,7 @@ setup(
     version=version,
     install_requires=[
         "numpy~=1.17",
-        "gym~=0.15",
+        "gym~=0.17",
         "filelock~=3.0",
         "cffi~=1.12",
         # optional, used for interactive mode

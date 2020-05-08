@@ -51,6 +51,7 @@ class VecRecorder():
                 fps=tps,
                 quality=9,
             )
+            print(f"OPENING {f'{self._base_name}{name}.mp4'}")
 
         def new_data_field(self, name):
             assert name not in self._data
@@ -64,15 +65,16 @@ class VecRecorder():
             self._data[name].append(np.array(data))
 
 
-    def __init__(self, record_dir, prefix = None, record_render=True, record_rew=True, record_action=True, record_done=True, continue_counter=True, counter=None):
+    def __init__(self, num_recs, record_dir, prefix = None, record_render=True, record_rew=True, record_action=True, record_done=True, continue_counter=True, counter=None):
         self._info_map = {}
         self._obs_map = {}
         self._record_render = record_render
         self._record_rew = record_rew
         self._record_action = record_action
         self._record_done = record_done
+        self._num_recs = num_recs
 
-        self._recs = {}
+        self._recs = [None for _ in range(num_recs)]
 
         os.makedirs(record_dir, exist_ok=True)
         self._path_base = os.path.join(record_dir, "" if prefix is None else f"{prefix}_")
@@ -82,56 +84,49 @@ class VecRecorder():
         if continue_counter:
             prev_recordings = sorted(glob.glob(f"{self._path_base}[0-9][0-9][0-9]*.mp4") + glob.glob(f"{self._path_base}[0-9][0-9][0-9].npz"))
             if len(prev_recordings) > 0:
-                self._counter = int(prev_recordings[-1][-7:-4])
+                self._counter = int(prev_recordings[-1][-7:-4])+1
 
         elif counter is not None:
             self._counter = counter;
 
+        print(f"COUNTER = {self._counter}")
 
-    def new_recording(self, rec_idx):
+    def new_recording(self, reopen):
 
+        for rec_idx, do_reopen in enumerate(reopen):
 
-        if isinstance(rec_idx, (list, tuple, set, np.ndarray)):
-            for i, ri in enumerate(rec_idx):
-                if isinstance(ri,(bool,np.bool_)):
-                    if ri:
-                        self.new_recording(i)
+            if not do_reopen:
+                continue
+
+            assert (self._recs[rec_idx] is None) or self._recs[rec_idx].is_closed()
+            rec = VecRecorder.Rec(f"{self._path_base}{self._counter:03d}")
+            self._counter += 1
+
+            if self._record_render:
+                rec.new_image_field()
+
+            if self._record_rew:
+                rec.new_data_field('reward')
+
+            if self._record_done:
+                rec.new_data_field('done')
+
+            if self._record_action:
+                rec.new_data_field('action')
+
+            for name, (no,tr,as_image) in self._obs_map.items():
+                if as_image:
+                    rec.new_image_field(name)
                 else:
-                    self.new_recording(ri)
-            return
+                    rec.new_data_field(name)
 
+            for name, (ni,tr,as_image) in self._info_map.items():
+                if as_image:
+                    rec.new_image_field(name)
+                else:
+                    rec.new_data_field(name)
 
-        if rec_idx in self._recs:
-            self._recs[rec_idx].close()
-
-        rec = VecRecorder.Rec(f"{self._path_base}{self._counter:03d}")
-        self._counter += 1
-
-        if self._record_render:
-            rec.new_image_field()
-
-        if self._record_rew:
-            rec.new_data_field('reward')
-
-        if self._record_done:
-            rec.new_data_field('done')
-
-        if self._record_action:
-            rec.new_data_field('action')
-
-        for name, (no,tr,as_image) in self._obs_map.items():
-            if as_image:
-                rec.new_image_field(name)
-            else:
-                rec.new_data_field(name)
-
-        for name, (ni,tr,as_image) in self._info_map.items():
-            if as_image:
-                rec.new_image_field(name)
-            else:
-                rec.new_data_field(name)
-
-        self._recs[rec_idx] = rec
+            self._recs[rec_idx] = rec
 
 
     def _check_data_key(self, key):
@@ -154,57 +149,48 @@ class VecRecorder():
         self._check_data_key(name_data)
         self._obs_map[name_data] = (name_obs, transform if transform is not None else lambda _:_, as_image)
 
-    def close(self, rec_idx=None):
+    def close(self, doclose):
 
-        if rec_idx is None:
-            rec_idx = list(self._recs.keys())
-        elif not isinstance(rec_idx,(tuple,list,set,np.ndarray)):
-            rec_idx = [rec_idx,]
+        for rec_idx, dclose in enumerate(doclose):
+            if not dclose:
+                continue
 
-        for ri in rec_idx:
-            assert ri in self._recs
-            self._recs[ri].close()
+            self._recs[rec_idx].close()
 
 
-    def new_entry(self, rec_idx=None, render=None, obs=None, rew=None, done=None, info=None, action=None):
+    def new_entry(self, render=None, obs=None, rew=None, done=None, info=None, action=None):
 
-        if rec_idx is None:
-            rec_idx = list(self._recs.keys())
-        elif not isinstance(rec_idx,(tuple,list,set,np.ndarray)):
-            rec_idx = [rec_idx,]
-
-        # rearranging the rendered image
-        if self._record_render:
-            render = render.reshape(render.shape[0]//512, 512, -1, 512, render.shape[2]).swapaxes(1,2).reshape(-1, 512, 512, render.shape[2])
-
-        for ri in rec_idx:
-
-            assert ri in self._recs
-            assert not self._recs[ri].is_closed()
+        for ri, rec in enumerate(self._recs):
+            if rec.is_closed():
+                continue
 
             if self._record_render:
-                self._recs[ri].write_image(render[ri])
+                rec.write_image(render[ri])
 
-            if self._record_rew:
-                self._recs[ri].write_data(rew[ri],'reward')
+            if rew is not None:
+                if self._record_rew:
+                    rec.write_data(rew[ri],'reward')
 
-            if self._record_done:
-                self._recs[ri].write_data(done[ri],'done')
+            if done is not None:
+                if self._record_done:
+                    rec.write_data(done[ri],'done')
 
-            if self._record_action:
-                self._recs[ri].write_data(action[ri],'action')
+            if action is not None:
+                if self._record_action:
+                    rec.write_data(action[ri],'action')
 
             for name_data, (name_obs, transform, as_image) in self._obs_map.items():
                 if as_image:
-                    self._recs[ri].write_image(transform(obs[name_obs][ri,...]),name_data)
+                    rec.write_image(transform(obs[name_obs][ri,...]),name_data)
                 else:
-                    self._recs[ri].write_data(transform(obs[name_obs][ri,...]),name_data)
+                    rec.write_data(transform(obs[name_obs][ri,...]),name_data)
 
-            for name_data, (name_info, transform, as_image) in self._info_map.items():
-                if as_image:
-                    self._recs[ri].write_image(transform(info[ri][name_info]),name_data)
-                else:
-                    self._recs[ri].write_data(transform(info[ri][name_info]),name_data)
+            if info is not None:
+                for name_data, (name_info, transform, as_image) in self._info_map.items():
+                    if as_image:
+                        rec.write_image(transform(info[ri][name_info]),name_data)
+                    else:
+                        rec.write_data(transform(info[ri][name_info]),name_data)
 
 
 
@@ -212,31 +198,37 @@ class SingleRecorder(VecRecorder):
 
     def __init__(self, record_dir, prefix = None, record_render=True, record_rew=True, record_action=True, record_done=True, continue_counter=True, counter=None):
 
-        VecRecorder.__init__(self, record_dir, prefix, record_render, record_rew, record_action, record_done, continue_counter, counter)
+        VecRecorder.__init__(self, 1, record_dir, prefix, record_render, record_rew, record_action, record_done, continue_counter, counter)
 
     def new_recording(self):
-        VecRecorder.new_recording(self,0)
+        VecRecorder.new_recording(self,[True])
+        self._recs[0].new_data_field('_')
+        self._recs[0].write_data('_','_')
 
     def close(self):
-        VecRecorder.new_recording(self,0)
+        VecRecorder.close(self,[True])
 
     def new_entry(self, render=None, obs=None, rew=None, done=None, info=None, action=None):
 
         rec = self._recs[0]
 
-        assert not rec.is_closed()
+        if rec.is_closed():
+            return
 
         if self._record_render:
             rec.write_image(render)
 
-        if self._record_rew:
-            rec.write_data(rew,'reward')
+        if rew is not None:
+            if self._record_rew:
+                rec.write_data(rew,'reward')
 
-        if self._record_done:
-            rec.write_data(done,'done')
+        if done is not None:
+            if self._record_done:
+                rec.write_data(done,'done')
 
-        if self._record_action:
-            rec.write_data(action,'action')
+        if action is not None:
+            if self._record_action:
+                rec.write_data(action,'action')
 
         for name_data, (name_obs, transform, as_image) in self._obs_map.items():
             if as_image:
@@ -244,11 +236,12 @@ class SingleRecorder(VecRecorder):
             else:
                 rec.write_data(transform(obs[name_obs]),name_data)
 
-        for name_data, (name_info, transform, as_image) in self._info_map.items():
-            if as_image:
-                rec.write_image(transform(info[name_info]),name_data)
-            else:
-                rec.write_data(transform(info[name_info]),name_data)
+        if info is not None:
+            for name_data, (name_info, transform, as_image) in self._info_map.items():
+                if as_image:
+                    rec.write_image(transform(info[name_info]),name_data)
+                else:
+                    rec.write_data(transform(info[name_info]),name_data)
 
 
 

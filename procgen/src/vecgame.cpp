@@ -43,14 +43,16 @@ libenv_venv *libenv_make(int num_envs, const struct libenv_options options) {
     return (libenv_venv *)(venv);
 }
 
-int libenv_are_games_finished(libenv_venv *env, bool *finished_games){
+int libenv_all_episodes_done(libenv_venv *env, bool *all_episodes_done){
   auto venv = (VecGame *)(env);
-  if (finished_games != nullptr) {
-    for (size_t i = 0; i < venv->finished_games.size(); i++ ){
-      finished_games[i] = venv->finished_games[i];
-    }
+  if (all_episodes_done == nullptr) {
+    return venv->num_envs;
   }
-  return venv->finished_games.size();
+  auto all_done = venv->all_episodes_done();
+  for (size_t i = 0; i < all_done.size(); i++ ){
+    all_episodes_done[i] = all_done[i];
+  }
+  return all_done.size();
 }
 
 int libenv_get_spaces(libenv_venv *env, enum libenv_spaces_name name,
@@ -202,7 +204,7 @@ VecGame::VecGame(int _nenvs, VecOptions opts) {
     opts.consume_int("rand_seed", &rand_seed);
     opts.consume_int("num_threads", &num_threads);
     opts.consume_string("resource_root", &resource_root);
-    opts.consume_int_vector("max_runs_per_game", max_runs_per_game);
+    opts.consume_int_vector("max_episodes_per_game", max_episodes_per_game);
 
     std::call_once(global_init_flag, global_init, rand_seed,
                    resource_root);
@@ -263,9 +265,7 @@ VecGame::VecGame(int _nenvs, VecOptions opts) {
         }
 
         games[n]->game_init();
-        games[n]->reset();
-
-        finished_games.push_back(false);
+        // games[n]->reset();
     }
 
     {
@@ -366,9 +366,21 @@ void VecGame::reset(const std::vector<std::vector<void *>> &obs) {
     wait_for_stepping_threads();
     for (int e = 0; e < num_envs; e++) {
         const auto &game = games[e];
-        game->render_to_buf(game->render_buf, RES_W, RES_H, false);
-        bgr32_to_rgb888(obs[e][0], game->render_buf, RES_W, RES_H);
+        // game->render_to_buf(game->render_buf, RES_W, RES_H, false);
+        // bgr32_to_rgb888(obs[e][0], game->render_buf, RES_W, RES_H);
+
+        game->connect_obs_buffer(observation_spaces, obs[e]);
+        game->reset();
+
     }
+}
+
+std::vector<bool> VecGame::all_episodes_done(){
+  std::vector<bool> all_done;
+  for (int e = 0; e < num_envs; e++) {
+      all_done.push_back(games[e]->get_num_episodes_done() >= max_episodes_per_game[e]);
+  }
+  return all_done;
 }
 
 void VecGame::step_async(const std::vector<int32_t> &acts,
@@ -383,8 +395,7 @@ void VecGame::step_async(const std::vector<int32_t> &acts,
 
         for (int e = 0; e < num_envs; e++) {
             const auto &game = games[e];
-            if ((max_runs_per_game[e] > 0) &&  (game->num_resets() > max_runs_per_game[e])){
-              finished_games[e] = true;
+            if ((max_episodes_per_game[e] > 0) &&  (game->get_num_episodes_done() >= max_episodes_per_game[e])){
               continue;
             }
             game->action = acts[e];

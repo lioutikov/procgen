@@ -19,6 +19,8 @@ from pyglet import gl
 from pyglet.window import key as keycodes
 
 
+from copy import deepcopy
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHAR_SIZE = 32
 FONT = None
@@ -57,8 +59,9 @@ class Interactive(abc.ABC):
         self._display_info = display_info
         self._seconds_to_display_done_info = 0
 
-        obs = env.reset()
-        self._image = self.get_image(obs, env)
+        self._obs = env.reset()
+        self._info = None
+        self._image = self.get_image(self._obs, env)
         assert (
             len(self._image.shape) == 3 and self._image.shape[2] == 3
         ), "must be an RGB image"
@@ -154,20 +157,12 @@ class Interactive(abc.ABC):
 
         self._skip_info_out = []
         self._step_cbs = []
-        self._info_record_keys = {}
-        self._obs_record_keys = {}
 
     def skip_info_out(self, name):
         self._skip_info_out.append(name)
 
     def add_step_callback(self, cb):
         self._step_cbs.append(cb)
-
-    def record_obs_as(self,key,name):
-        self._obs_record_keys[key] = name
-
-    def record_info_as(self,key,name):
-        self._info_record_keys[key] = name
 
     def _update(self, dt):
         # if we're displaying done info, don't advance the simulation
@@ -217,58 +212,64 @@ class Interactive(abc.ABC):
                 if act is None:
                     act = 4
 
-                obs, rew, done, info = self._env.step(act)
-
-                self._image = self.get_image(obs, self._env)
+                next_obs, rew, done, next_info = self._env.step(act)
 
                 if self.recorder is not None:
-                    self.recorder.new_entry(self._image, obs, rew, done, info, act)
+
+                    self.recorder.new_entry(self._image, self._obs, rew, done, self._info, act)
 
                 self._episode_return += rew
                 self._steps += 1
                 self._episode_steps += 1
 
                 for cb in self._step_cbs:
-                    cb(obs, rew, done, info, self._episode_steps, self._episode_return)
+                    cb(self._obs, rew, done, self._info, self._episode_steps, self._episode_return)
 
-                self._last_info = dict(episode_steps=self._episode_steps, episode_return=self._episode_return, **info)
+                self._obs = next_obs
+                self._info = next_info
+
+                self._image = self.get_image(self._obs, self._env)
+
+                self._last_info = dict(episode_steps=self._episode_steps, episode_return=self._episode_return, **next_info)
                 np.set_printoptions(precision=2)
                 done_int = int(done)  # shorter than printing True/False
                 if self._sync:
-                    print(
-                        "done={} steps={} episode_steps={} rew={} episode_return={}".format(
-                            done_int,
-                            self._steps,
-                            self._episode_steps,
-                            rew,
-                            self._episode_return,
-                        )
-                    )
+                    pass
+                    # print(
+                    #     "done={} steps={} episode_steps={} rew={} episode_return={}".format(
+                    #         done_int,
+                    #         self._steps,
+                    #         self._episode_steps,
+                    #         rew,
+                    #         self._episode_return,
+                    #     )
+                    # )
                 elif self._steps % self._tps == 0 or done:
                     episode_return_delta = (
                         self._episode_return - self._prev_episode_return
                     )
                     self._prev_episode_return = self._episode_return
-                    print(
-                        "done={} steps={} episode_steps={} episode_return_delta={} episode_return={}".format(
-                            done_int,
-                            self._steps,
-                            self._episode_steps,
-                            episode_return_delta,
-                            self._episode_return,
-                        )
-                    )
+                    # print(
+                    #     "done={} steps={} episode_steps={} episode_return_delta={} episode_return={}".format(
+                    #         done_int,
+                    #         self._steps,
+                    #         self._episode_steps,
+                    #         episode_return_delta,
+                    #         self._episode_return,
+                    #     )
+                    # )
 
                 if done:
-                    print(f"final info={self._last_info}")
-                    obs = self._env.reset()
-                    self._image = self.get_image(obs, self._env)
+                    self._obs = self._env.reset()
+                    self._info = None
+                    self._image = self.get_image(self._obs, self._env)
                     self._episode_steps = 0
                     self._episode_return = 0
                     self._prev_episode_return = 0
                     self._episode += 1
 
                     if self.recorder is not None:
+                        self.recorder.close()
                         self.recorder.new_recording()
 
                     # if self._movie_writer is not None:

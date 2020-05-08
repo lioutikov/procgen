@@ -156,12 +156,10 @@ class CVecEnv:
 
         if additional_obs_spaces is not None:
             for space in additional_obs_spaces:
-                print(f"adding obs space: {space}")
                 self._c_lib.libenv_add_space(self._c_env, self._c_lib.LIBENV_SPACES_OBSERVATION, space.to_libenv_space(self._ffi, self._c_lib) )
 
         if additional_info_spaces is not None:
             for space in additional_info_spaces:
-                print(f"adding info space: {space}")
                 self._c_lib.libenv_add_space(self._c_env, self._c_lib.LIBENV_SPACES_INFO, space.to_libenv_space(self._ffi, self._c_lib) )
 
 
@@ -471,11 +469,11 @@ class CVecEnv:
         infos = [{} for _ in range(self.num_envs)]  # type: List[Dict]
         for key, values in self._infos.items():
             for env_idx in range(self.num_envs):
-                v = values[env_idx]
-                if v.shape == (1,):
+                if values[env_idx].shape == (1,):
                     # extract scalar values
-                    v = v[0]
-                infos[env_idx][key] = v
+                    infos[env_idx][key] = values[env_idx][0]
+                else:
+                    infos[env_idx][key] = values[env_idx] if self._reuse_arrays else values[env_idx].copy()
 
         return (
             self._maybe_copy_dict(self._observations),
@@ -609,16 +607,16 @@ class CVecEnv:
     def _var_from_libenv():
         raise NotImplementedEroor()
 
-    def are_games_finished(self):
+    def all_episodes_done(self):
 
-        count = self._c_lib.libenv_are_games_finished(self._c_env, self._ffi.NULL)
+        count = self._c_lib.libenv_all_episodes_done(self._c_env, self._ffi.NULL)
         if count == 0:
             return np.array([],dtype=np.bool)
 
-        finished_games = np.full(count, False, dtype=np.bool)
-        cffi_arr = self._ffi.cast('bool*', finished_games.ctypes.data)
-        self._c_lib.libenv_are_games_finished(self._c_env, cffi_arr)
-        return finished_games
+        all_done = np.full(count, False, dtype=np.bool)
+        cffi_arr = self._ffi.cast('bool*', all_done.ctypes.data)
+        self._c_lib.libenv_all_episodes_done(self._c_env, cffi_arr)
+        return all_done
 
 
     def get_images(self) -> np.ndarray:

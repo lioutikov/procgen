@@ -82,16 +82,16 @@ def main():
 
         action = np.array([env.action_space.sample() for _ in range(num_envs)])
         obs, rew, done, info = env.step(action)
-        finished_games = env.are_games_finished()
+        all_episodes_done = env.all_episodes_done()
 
         if recorder is not None:
             renders = env.render(mode="rgb_array")
             recorder.new_entry(render=renders, obs=obs, rew=rew, done=done, info=info, action=action)
-            recorder.new_recording(done & ~finished_games)
+            recorder.new_recording(done & ~all_episodes_done)
 
 
         step += 1
-        if all(finished_games):
+        if all(all_episodes_done):
             break
 
     env.close()

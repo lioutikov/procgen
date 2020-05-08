@@ -107,8 +107,8 @@ void Game::render_to_buf(void *dst, int w, int h, bool antialias) {
     game_draw(p, rect);
 }
 
-int Game::num_resets(){
-  return reset_count;
+int Game::get_num_episodes_done(){
+  return num_episodes_done;
 }
 
 void Game::reset() {
@@ -131,6 +131,12 @@ void Game::reset() {
 
     rand_gen.seed(current_level_seed);
     game_reset();
+
+    auto ptr = point_to_obs<uint8_t>("rgb");
+    if (ptr != 0){
+      render_to_buf(render_buf, RES_W, RES_H, false);
+      bgr32_to_rgb888(ptr, render_buf, RES_W, RES_H);
+    }
 
     cur_time = 0;
     total_reward = 0;
@@ -172,6 +178,9 @@ void Game::step() {
     }
 
     episode_done = step_data.done;
+    if (step_data.done){
+      num_episodes_done++;
+    }
 
     auto ptr = point_to_obs<uint8_t>("rgb");
     if (ptr != 0){

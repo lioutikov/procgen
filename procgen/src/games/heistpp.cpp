@@ -315,22 +315,60 @@ class HeistPPGame : public BasicAbstractGame {
         }
 
 
+        auto diamond = spawn_entity(.375 * maze_scale, EXIT, diamond_pos.first, diamond_pos.second, maze_scale, maze_scale);
+        diamond->x = -1;
+        diamond->y = -1;
+
+        match_aspect_ratio(diamond);
+
+        auto cells = rand_gen.simple_choose(grid_size, grid_size);
+        std::vector<std::pair<int,int>> agent_diamond_pairs;
+        uint32_t max_agent_diamond_locations = 5;
+        int _curr_agent_cell = -1;
+
+
+        for (int cell : cells){
+          if(get_obj(cell) != SPACE){
+            continue;
+          }
+          if(_curr_agent_cell == -1){
+            agent->x = (cell % main_width) + .5;
+            agent->y = (cell / main_width) + .5;
+            if(has_any_collision(agent,0,true)){
+              continue;
+            }
+            _curr_agent_cell = cell;
+          }else{
+            diamond->x = (cell % main_width) + .5;
+            diamond->y = (cell / main_width) + .5;
+            if(has_any_collision(diamond,0,true)){
+              continue;
+            }
+            if(sqrt(pow(diamond->x-agent->x,2)+pow(diamond->y-agent->y,2)) <= 2.3){
+              continue;
+            }
+            agent_diamond_pairs.push_back(std::pair<int,int>(_curr_agent_cell, cell));
+            _curr_agent_cell = -1;
+          }
+
+          if(agent_diamond_pairs.size() >= max_agent_diamond_locations){
+            break;
+          }
+        }
+
+        bool agent_is_first = placement_rand_gen.randbool();
+        int agent_diamond_rdx  = placement_rand_gen.randn(agent_diamond_pairs.size());
+
         if (agent_cell == -1){
-          agent->x = agent_pos.first;
-          agent->y = agent_pos.second;
+          agent->x = (agent_diamond_pairs[0].first % main_width) + .5;
+          agent->y = (agent_diamond_pairs[0].first / main_width) + .5;
         }else if (agent_cell == -2){
-          int i_rand  = placement_rand_gen.randn(grid_size);
-          for(int i = 0; i < grid_size; i++){
-              int cell = i+i_rand % grid_size;
-              if(get_obj(cell) != SPACE){
-                continue;
-              }
-              agent->x = (cell % main_width) + .5;
-              agent->y = (cell / main_width) + .5;
-              if(has_any_collision(agent,0,true)){
-                continue;
-              }
-              break;
+          if(agent_is_first){
+            agent->x = (agent_diamond_pairs[agent_diamond_rdx].first % main_width) + .5;
+            agent->y = (agent_diamond_pairs[agent_diamond_rdx].first / main_width) + .5;
+          }else{
+            agent->x = (agent_diamond_pairs[agent_diamond_rdx].second % main_width) + .5;
+            agent->y = (agent_diamond_pairs[agent_diamond_rdx].second / main_width) + .5;
           }
         }else{
           fassert(agent_cell >= 0);
@@ -344,26 +382,16 @@ class HeistPPGame : public BasicAbstractGame {
           fassert(!has_any_collision(agent,0,true));
         }
 
-
-        auto diamond = spawn_entity(.375 * maze_scale, EXIT, diamond_pos.first, diamond_pos.second, maze_scale, maze_scale);
-        match_aspect_ratio(diamond);
-
         if (diamond_cell == -1){
-          diamond->x = diamond_pos.first;
-          diamond->y = diamond_pos.second;
+          agent->x = (agent_diamond_pairs[0].second % main_width) + .5;
+          agent->y = (agent_diamond_pairs[0].second / main_width) + .5;
         }else if (diamond_cell == -2){
-          int i_rand  = placement_rand_gen.randn(grid_size);
-          for(int i = 0; i < grid_size; i++){
-              int cell = i+i_rand % grid_size;
-              if(get_obj(cell) != SPACE){
-                continue;
-              }
-              diamond->x = (cell % main_width) + .5;
-              diamond->y = (cell / main_width) + .5;
-              if(has_any_collision(diamond,0,true)){
-                continue;
-              }
-              break;
+          if(agent_is_first){
+            diamond->x = (agent_diamond_pairs[agent_diamond_rdx].second % main_width) + .5;
+            diamond->y = (agent_diamond_pairs[agent_diamond_rdx].second / main_width) + .5;
+          }else{
+            diamond->x = (agent_diamond_pairs[agent_diamond_rdx].first % main_width) + .5;
+            diamond->y = (agent_diamond_pairs[agent_diamond_rdx].first / main_width) + .5;
           }
         }else{
           fassert(diamond_cell >= 0);
@@ -388,6 +416,13 @@ class HeistPPGame : public BasicAbstractGame {
             ent->render_z = 1;
             ent->use_abs_coords = true;
             match_aspect_ratio(ent);
+        }
+
+        auto ptr_state_obs = point_to_obs<uint8_t>("state");
+        std::cout << "should be writing " << ptr_state_obs << std::endl;
+        if (ptr_state_obs != 0){
+          std::cout << "am writing" << std::endl;
+          write_state_to_buffer(ptr_state_obs);
         }
     }
 

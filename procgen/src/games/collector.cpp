@@ -23,6 +23,7 @@ const int FUEL= 14;
 
 const int MARKER = 1003;
 
+
 class Collector : public BasicAbstractGame {
 
   class CellManager {
@@ -49,6 +50,10 @@ class Collector : public BasicAbstractGame {
       cells = tmp;
     }
 
+    int get_world_dim(){
+      return main_width-6;
+    }
+
     void randomize(){
       cells = rand_gen->choose_n(cells, (int)(cells.size()));
     }
@@ -72,6 +77,180 @@ class Collector : public BasicAbstractGame {
       int idx = rand_gen->randn((int)(cells.size()));
       return pop_at(idx);
     }
+
+    int pop_random_min_distance_from(std::pair<float,float> min_center, float min_dist){
+      int rdx = rand_gen->randn((int)(cells.size()));
+      for (uint32_t i = 0; i < cells.size(); i++){
+        int idx = (i+rdx) % cells.size();
+        int cell = cells[idx];
+        std::pair<float,float> pos = cell_to_pos(cell);
+
+        float dist = sqrt(pow(pos.first-min_center.first,2)+pow(pos.second-min_center.second,2));
+        if (dist >= min_dist){
+          return pop_at(idx);
+        }
+      }
+    }
+
+    int pop_random_max_distance_from(std::pair<float,float> max_center, float max_dist){
+      int rdx = rand_gen->randn((int)(cells.size()));
+      for (uint32_t i = 0; i < cells.size(); i++){
+        int idx = (i+rdx) % cells.size();
+        int cell = cells[idx];
+        std::pair<float,float> pos = cell_to_pos(cell);
+
+        float dist = sqrt(pow(pos.first-max_center.first,2)+pow(pos.second-max_center.second,2));
+        if (dist <= max_dist){
+          return pop_at(idx);
+        }
+      }
+    }
+
+    int pop_random_min_max_distance_from(std::pair<float,float> min_center, float min_dist, std::pair<float,float> max_center, float max_dist){
+      int rdx = rand_gen->randn((int)(cells.size()));
+      for (uint32_t i = 0; i < cells.size(); i++){
+        int idx = (i+rdx) % cells.size();
+        int cell = cells[idx];
+        std::pair<float,float> pos = cell_to_pos(cell);
+
+        float dist_a = sqrt(pow(pos.first-min_center.first,2)+pow(pos.second-min_center.second,2));
+        float dist_b = sqrt(pow(pos.first-max_center.first,2)+pow(pos.second-max_center.second,2));
+        if ((dist_a >= min_dist) && (dist_b <= max_dist)){
+          return pop_at(idx);
+        }
+      }
+      return -1;
+    }
+
+    int pop_random_min_max_distance_from(std::vector<std::shared_ptr<Entity> > *entities, float min_dist, std::pair<float,float> max_center, float max_dist){
+      int rdx = rand_gen->randn((int)(cells.size()));
+      for (uint32_t i = 0; i < cells.size(); i++){
+        int idx = (i+rdx) % cells.size();
+        int cell = cells[idx];
+        std::pair<float,float> pos = cell_to_pos(cell);
+
+        if (min_dist > 0.0){
+          bool valid = true;
+          for (auto ent_it = entities->begin(); ent_it != entities->end(); ++ent_it){
+            if( pow(pos.first-(*ent_it)->x,2)+ pow(pos.second-(*ent_it)->y,2) < pow(min_dist,2)){
+              valid = false;
+              break;
+            }
+          }
+          if (!valid) continue;
+        }
+
+        if (max_dist > 0.0){
+          if (pow(pos.first-max_center.first,2)+ pow(pos.second-max_center.second,2) > pow(max_dist,2)) continue;
+        }
+        return pop_at(idx);
+      }
+    }
+
+    int pop_random_min_min_max_distance_from(std::pair<float,float> min_center0, float min_dist0, std::vector<std::shared_ptr<Entity> > *entities, float min_dist, std::pair<float,float> max_center, float max_dist){
+
+      int rdx = rand_gen->randn((int)(cells.size()));
+      for (uint32_t i = 0; i < cells.size(); i++){
+        int idx = (i+rdx) % cells.size();
+        int cell = cells[idx];
+        std::pair<float,float> pos = cell_to_pos(cell);
+
+        if (min_dist0 > 0.0){
+          if (pow(pos.first-min_center0.first,2)+ pow(pos.second-min_center0.second,2) < pow(min_dist0,2)){
+            continue;
+          }
+        }
+
+        if (max_dist > 0.0){
+          if (pow(pos.first-max_center.first,2)+ pow(pos.second-max_center.second,2) > pow(max_dist,2)) continue;
+        }
+
+        if (min_dist > 0.0){
+          bool valid = true;
+          for (auto ent_it = entities->begin(); ent_it != entities->end(); ++ent_it){
+            if( pow(pos.first-(*ent_it)->x,2)+ pow(pos.second-(*ent_it)->y,2) < pow(min_dist,2)){
+              valid = false;
+              break;
+            }
+          }
+          if (!valid) continue;
+        }
+
+        return pop_at(idx);
+      }
+
+      return -1;
+    }
+
+    int pop_random_in_line(std::pair<float,float> pos0, std::pair<float,float> pos1, std::vector<std::shared_ptr<Entity> > *entities, float min_dist, std::pair<float,float> max_center, float max_dist){
+
+      std::vector<int> shifts;
+
+      for(int n = 1; n < fabs(pos1.first-pos0.first); n++){
+        shifts.push_back(n);
+      }
+
+      for(int n = 1; n < fabs(pos1.second-pos0.second); n++){
+        shifts.push_back(-n);
+      }
+
+      std::set<int> skip;
+      for (int n : rand_gen->choose_n(shifts,shifts.size())){
+        std::pair<float,float> base = pos0;
+        if (n >= 0){ //try shift in x
+          if (pos1.first < pos0.first){
+            n = -n;
+          }
+          base.first += n;
+          base.second += (pos1.second-pos0.second)/(pos1.first-pos0.first)*n;
+        }else{ //try shift in y
+          if (pos1.second > pos0.second){
+            n = -n;
+          }
+          base.first += (pos1.first-pos0.first)/(pos1.second-pos0.second)*n;
+          base.second += n;
+        }
+
+        // random offsets
+        for(int roff : rand_gen->simple_choose(9,9)){
+          int xoff = (roff % 3) -1;
+          int yoff = (roff / 3) -1;
+
+          std::pair<float,float> candidate(base.first+xoff,base.second+yoff);
+
+          int cell = pos_to_cell(candidate);
+          if (skip.find(cell) != skip.end()) continue;
+
+          if (!contains(cell)){
+            skip.insert(cell);
+            continue;
+          }
+
+          if (min_dist > 0.0){
+            bool valid = true;
+            for (auto ent_it = entities->begin(); ent_it != entities->end(); ++ent_it){
+              if( pow(candidate.first-(*ent_it)->x,2)+ pow(candidate.second-(*ent_it)->y,2) < pow(min_dist,2)){
+                valid = false;
+                skip.insert(cell);
+                break;
+              }
+            }
+            if (!valid) continue;
+          }
+
+          if (max_dist > 0.0){
+            if (pow(candidate.first-max_center.first,2)+ pow(candidate.second-max_center.second,2) > pow(max_dist,2)){
+              skip.insert(cell);
+              continue;
+            }
+          }
+            return pop_cell(cell);
+          }
+
+      }
+      return -1;
+    }
+
 
     void push(int cell){
       if (!contains(cell)){
@@ -186,6 +365,47 @@ class Collector : public BasicAbstractGame {
     }
 
     std::pair<std::pair<float,float>,std::pair<float,float>> get_mirrored_pair(const std::pair<float,float> &mirror_line_a, const std::pair<float,float> &mirror_line_b, float min_distance, float min_radius, std::vector<std::shared_ptr<Entity> > *entities){
+      // int rand_idx = rand_gen->randn((int)(cells.size()));
+      //
+      // int ci1,ci2;
+      // std::pair<float,float> c1;
+      // std::pair<float,float> c2;
+      // for (uint32_t i = 0; i < cells.size(); i++){
+      //   ci1 = cells[(i+rand_idx) % cells.size()];
+      //   c1 = cell_to_pos(ci1);
+      //   c2 = peek_mirrored_point(c1,get_projection_on_line(c1,mirror_line_a,mirror_line_b));
+      //   ci2 = pos_to_cell(c2);
+      //   if (ci1 == ci2) continue;
+      //   if (!contains(ci2)) continue;
+      //   if ((min_distance > 0.0) && (pow(c1.first-c2.first,2)+ pow(c1.second-c2.second,2) < pow(min_distance,2))) continue;
+      //   if (min_radius > 0.0){
+      //     bool valid = true;
+      //     for (auto ent_it = entities->begin(); ent_it != entities->end(); ++ent_it){
+      //       if( pow(c1.first-(*ent_it)->x,2)+ pow(c1.second-(*ent_it)->y,2) < pow(min_radius,2)){
+      //         valid = false;
+      //         break;
+      //       }
+      //       if( pow(c2.first-(*ent_it)->x,2)+ pow(c2.second-(*ent_it)->y,2) < pow(min_radius,2)){
+      //         valid = false;
+      //         break;
+      //       }
+      //     }
+      //     if (!valid) continue;
+      //   }
+      //   // std::cout << "c1 c2: " << c1.first << "," << c1.second << " " << c2.first << "," << c2.second << std::endl;
+      //   // std::cout << "ci1 ci2: " << ci1 << " " << ci2 << std::endl;
+      //   pop_cell(ci1);
+      //   pop_cell(ci2);
+      //   return std::pair<std::pair<float,float>,std::pair<float,float>>(c1,c2);
+      // }
+      // std::cout << "No fitting pair found" << std::endl;
+      // fassert(false);
+
+      return get_mirrored_pair(mirror_line_a, mirror_line_b, min_distance, 0.0, entities, 0.0);
+    }
+
+
+    std::pair<std::pair<float,float>,std::pair<float,float>> get_mirrored_pair(const std::pair<float,float> &mirror_line_a, const std::pair<float,float> &mirror_line_b, float min_distance, float min_radius, std::vector<std::shared_ptr<Entity> > *entities, float max_off_center){
       int rand_idx = rand_gen->randn((int)(cells.size()));
 
       int ci1,ci2;
@@ -199,6 +419,11 @@ class Collector : public BasicAbstractGame {
         if (ci1 == ci2) continue;
         if (!contains(ci2)) continue;
         if ((min_distance > 0.0) && (pow(c1.first-c2.first,2)+ pow(c1.second-c2.second,2) < pow(min_distance,2))) continue;
+        if (max_off_center > 0.0){
+          auto cter = get_center();
+          if (pow(c1.first-cter.first,2)+ pow(c1.second-cter.second,2) > pow(max_off_center,2)) continue;
+          if (pow(c2.first-cter.first,2)+ pow(c2.second-cter.second,2) > pow(max_off_center,2)) continue;
+        }
         if (min_radius > 0.0){
           bool valid = true;
           for (auto ent_it = entities->begin(); ent_it != entities->end(); ++ent_it){
@@ -296,6 +521,19 @@ class Collector : public BasicAbstractGame {
           y = new_y;
           collides_with_entities = true;
           existing = true;
+        }
+
+        void push_state_to_vector(std::vector<float> &state){
+          if (type == RESOURCE_RED){
+            state.push_back(1.0);
+          }else if (type == RESOURCE_GREEN){
+            state.push_back(2.0);
+          }else if (type == FUEL){
+            state.push_back(3.0);
+          }
+          state.push_back(x);
+          state.push_back(y);
+          state.push_back(existing);
         }
 
     };
@@ -402,6 +640,32 @@ class Collector : public BasicAbstractGame {
       return res;
     }
 
+    int num_slots(){
+      return resource_slots.size();
+    }
+
+    int get_resource_type_at_slot(int idx){
+      return resource_slots[idx].first;
+    }
+
+    int get_value_at_slot(int idx){
+      return resource_slots[idx].second;
+    }
+
+    std::pair<int,float> withdraw_slot(int idx){
+      if (resource_slots.empty()){
+        return std::pair<int,float>(0,0.0);
+      }
+      std::pair<int,float> res = resource_slots[idx];
+      resource_slots.erase(resource_slots.begin()+idx);
+      float net_value = ResourceContainer::withdraw(res.second);
+      if (net_value != res.second){
+        std::cout << "net_value: " << net_value << " res.second: " << res.second << std::endl;
+        throw std::logic_error("Something went very wrong here...");
+      }
+      return res;
+    }
+
     std::vector<std::pair<int,float>> get_percentages(){
       std::vector<std::pair<int,float>> res;
       for (auto p : resource_slots ){
@@ -443,7 +707,8 @@ class Collector : public BasicAbstractGame {
       float step_value;
       float max_value;
       bool existing;
-      std::vector<int> resource_types;
+      std::vector<int> accepted_resource_types;
+      std::vector<int> ignored_resource_types;
 
     public:
       // std::make_shared<Entity>(src->x, src->y, vx, vy, obj_r, type);
@@ -452,12 +717,21 @@ class Collector : public BasicAbstractGame {
       }
 
       void add_resource_type(int resource_type){
-        resource_types.push_back(resource_type);
+        accepted_resource_types.push_back(resource_type);
+      }
+
+      void add_ignore_type(int resource_type){
+        ignored_resource_types.push_back(resource_type);
       }
 
       bool accepts_resource_type(int resource_type){
-        std::vector<int>::iterator it = std::find(resource_types.begin(), resource_types.end(), resource_type);
-        return (it != resource_types.end());
+        std::vector<int>::iterator it = std::find(accepted_resource_types.begin(), accepted_resource_types.end(), resource_type);
+        return (it != accepted_resource_types.end());
+      }
+
+      bool ignores_resource_type(int resource_type){
+        std::vector<int>::iterator it = std::find(ignored_resource_types.begin(), ignored_resource_types.end(), resource_type);
+        return (it != ignored_resource_types.end());
       }
 
       void step() override {
@@ -493,21 +767,85 @@ class Collector : public BasicAbstractGame {
 
       float consume(const std::shared_ptr<ResourceContainerSlotted> &container){
         float net_value = 0.0;
-        while (container->get_value() > 0.0){
-          std::pair<int,float> slot = container->withdraw_last_slot();
+
+        for (int idx = container->num_slots()-1; idx >=0; idx--){
+          if(ignores_resource_type(container->get_resource_type_at_slot(idx))){
+            continue;
+          }
+          std::pair<int,float> slot = container->withdraw_slot(idx);
           if (accepts_resource_type(slot.first)){
             net_value += deposit(slot.second);
           }
         }
         return net_value;
+        //
+        //
+        // while (container->get_value() > 0.0){
+        //   std::pair<int,float> slot = container->withdraw_last_slot();
+        //
+        //   if (accepts_resource_type(slot.first)){
+        //     net_value += deposit(slot.second);
+        //   }
+        // }
+        // return net_value;
       }
-
-
 
       void reset(){
         value = 0.0;
       }
 
+      void push_state_to_vector(std::vector<float> &state){
+        if (type == GOAL_RED){
+          state.push_back(1.0);
+        }else if (type == GOAL_GREEN){
+          state.push_back(2.0);
+        }
+        state.push_back(x);
+        state.push_back(y);
+        state.push_back(get_value());
+      }
+
+  };
+
+  class GoalManager{
+
+  protected:
+    std::vector<std::shared_ptr<Goal>> goals;
+    std::vector<std::shared_ptr<Entity> > *entities;
+    float goal_init;
+    float goal_step;
+    float goal_max;
+
+  public:
+    GoalManager(std::vector<std::shared_ptr<Entity> > *_entities, float _goal_init, float _goal_step, float _goal_max): entities(_entities), goal_init(_goal_init), goal_step(_goal_step), goal_max(_goal_max){
+
+    }
+
+    std::shared_ptr<Goal> spawn(int goal_type, std::pair<float,float> pos){
+      auto goal = std::make_shared<Goal>(goal_init, goal_step, goal_max, pos.first, pos.second, 0.0, 0.0, 0.5, goal_type);
+      goal->collides_with_entities = true;
+      if (goal_type == GOAL_GREEN){
+        goal->add_resource_type(RESOURCE_GREEN);
+      }else if (goal_type == GOAL_RED){
+        goal->add_resource_type(RESOURCE_RED);
+      }else{
+        std::cout << "UNKNOWN GOAL TYPE: " << goal_type << std::endl;
+        fassert(false);
+      }
+      goals.push_back(goal);
+      entities->push_back(goal);
+      return goal;
+    }
+
+    void reset(){
+      goals.clear();
+    }
+
+    void push_state_to_vector(std::vector<float> &state){
+      for (auto goal : goals){
+        goal->push_state_to_vector(state);
+      }
+    }
   };
 
   class ResourceRespawnTime{
@@ -672,21 +1010,20 @@ public:
   class ResourceManager{
 
   protected:
-      std::shared_ptr<CellManager> free_cells;
+
+      std::vector<std::shared_ptr<Resource> > resources;
       std::vector<std::shared_ptr<Entity> > *entities;
 
     public:
-    ResourceManager(std::shared_ptr<CellManager> &_free_cells, std::vector<std::shared_ptr<Entity> > *_entities): free_cells(_free_cells), entities(_entities){
+    ResourceManager(std::vector<std::shared_ptr<Entity> > *_entities): entities(_entities){
     }
 
-    void spawn(int resource_type, int cell){
-      spawn(resource_type, free_cells->cell_to_pos(cell));
-    }
-
-    void spawn(int resource_type, std::pair<float,float> pos){
+    std::shared_ptr<Resource> spawn(int resource_type, std::pair<float,float> pos){
       auto resource = std::make_shared<Resource>(0.0, 1.0, 10.0, pos.first, pos.second, 0.0, 0.0, 0.5, resource_type);
       resource->collides_with_entities = true;
+      resources.push_back(resource);
       entities->push_back(resource);
+      return resource;
     }
 
     void respawn(const std::shared_ptr<Resource> &resource){
@@ -699,6 +1036,62 @@ public:
       }
     }
 
+    void reset(){
+      resources.clear();
+    }
+
+    void push_state_to_vector(std::vector<float> &state){
+      for (auto resource : resources){
+        resource->push_state_to_vector(state);
+      }
+    }
+
+  };
+
+  class Obstacle : public Entity {
+
+  public:
+
+    Obstacle(float _x, float _y, float _vx, float _vy, float _r, int _type): Entity(_x, _y, _vx, _vy, _r, _type){
+    }
+
+    void push_state_to_vector(std::vector<float> &state){
+      state.push_back(x);
+      state.push_back(y);
+      state.push_back(1.0);
+    }
+  };
+
+  class ObstacleManager{
+
+  protected:
+
+    std::vector<std::shared_ptr<Obstacle>> obstacles;
+    std::vector<std::shared_ptr<Entity> > *entities;
+
+  public:
+    ObstacleManager(std::vector<std::shared_ptr<Entity> > *_entities): entities(_entities){
+
+    }
+
+    std::shared_ptr<Obstacle> spawn(std::pair<float,float> pos){
+
+      auto obstacle = std::make_shared<Obstacle>(pos.first, pos.second, 0.0, 0.0, 0.5, OBSTACLE);
+      obstacle->collides_with_entities = true;
+      obstacles.push_back(obstacle);
+      entities->push_back(obstacle);
+      return obstacle;
+    }
+
+    void reset(){
+      obstacles.clear();
+    }
+
+    void push_state_to_vector(std::vector<float> &state){
+      for (auto obstacle : obstacles){
+        obstacle->push_state_to_vector(state);
+      }
+    }
   };
 
 
@@ -755,16 +1148,35 @@ public:
       agent->y = pos.second;
     }
 
+    void push_state_to_vector(std::vector<float> &state){
+      state.push_back(agent->x);
+      state.push_back(agent->y);
+      state.push_back(agent->rotation);
+      state.push_back(agent->vx);
+      state.push_back(agent->vy);
+      state.push_back(agent->vrot);
+      state.push_back(fuel->get_value());
+      state.push_back(resources->get_value(RESOURCE_GREEN));
+      state.push_back(resources->get_value(RESOURCE_RED));
+    }
+
   };
+
+  struct Managers{
+    std::shared_ptr<CellManager> cell;
+    std::shared_ptr<ResourceManager> resource;
+    std::shared_ptr<GoalManager> goal;
+    std::shared_ptr<ObstacleManager> obstacle;
+  };
+
 
   class InitLocator {
 
   protected:
-    std::shared_ptr<CellManager> free_cells;
+    const Managers &managers;
     std::vector<std::shared_ptr<Entity> > *entities;
-    std::shared_ptr<ResourceManager> resources;
 public:
-    InitLocator(std::shared_ptr<CellManager> &_free_cells, std::vector<std::shared_ptr<Entity> > *_entities, std::shared_ptr<ResourceManager> &_resources): free_cells(_free_cells), entities(_entities), resources(_resources){
+    InitLocator(const Managers &_managers, std::vector<std::shared_ptr<Entity> > *_entities): managers(_managers), entities(_entities){
     }
 
     virtual void init(const std::shared_ptr<Ship> &ship, GameOptions &options) = 0;
@@ -779,7 +1191,7 @@ public:
   class InitLocatorRandom : public InitLocator {
 
   public:
-    InitLocatorRandom(std::shared_ptr<CellManager> &_free_cells, std::vector<std::shared_ptr<Entity> > *_entities, std::shared_ptr<ResourceManager> &_resources) : InitLocator(_free_cells, _entities, _resources){
+    InitLocatorRandom(const Managers &_managers, std::vector<std::shared_ptr<Entity> > *_entities) : InitLocator(_managers, _entities){
     }
 
 
@@ -787,8 +1199,8 @@ public:
     virtual void init(const std::shared_ptr<Ship> &ship, GameOptions &options) override{
 
 
-      std::pair<float,float> agent_pos = free_cells->cell_to_pos(free_cells->pop_random());
-      std::pair<float,float> center_pos = free_cells->get_center();
+      std::pair<float,float> agent_pos = managers.cell->cell_to_pos(managers.cell->pop_random());
+      std::pair<float,float> center_pos = managers.cell->get_center();
       ship->set_pose(agent_pos, center_pos);
 
       int num_resources_green = options.get<int32_t>("num_resources_green");
@@ -797,43 +1209,30 @@ public:
       int num_obstacles = options.get<int32_t>("num_obstacles");
       int num_goals_red = options.get<int32_t>("num_goals_red");
       int num_goals_green = options.get<int32_t>("num_goals_green");
-      float goal_max = options.get<float>("goal_max");
-      float goal_init = options.get<float>("goal_init");
 
 
       for (int i=0; i< num_goals_green; i++){
-        std::pair<float,float> pos = free_cells->cell_to_pos(free_cells->pop_random());
-        auto goal = std::make_shared<Goal>(goal_init, goal_max/1000, goal_max, pos.first, pos.second, 0.0, 0.0, 0.5, GOAL_GREEN);
-        goal->collides_with_entities = true;
-        goal->add_resource_type(RESOURCE_GREEN);
-        entities->push_back(goal);
+        managers.goal->spawn(GOAL_GREEN, managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
       for (int i=0; i< num_goals_red; i++){
-        std::pair<float,float> pos = free_cells->cell_to_pos(free_cells->pop_random());
-        auto goal = std::make_shared<Goal>(goal_init, goal_max/1000, goal_max, pos.first, pos.second, 0.0, 0.0, 0.5, GOAL_RED);
-        goal->collides_with_entities = true;
-        goal->add_resource_type(RESOURCE_RED);
-        entities->push_back(goal);
+        managers.goal->spawn(GOAL_RED, managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
       for (int i=0; i<num_resources_green; i++){
-        resources->spawn(RESOURCE_GREEN, free_cells->pop_random());
+        managers.resource->spawn(RESOURCE_GREEN, managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
       for (int i=0; i<num_resources_red; i++){
-        resources->spawn(RESOURCE_RED, free_cells->pop_random());
+        managers.resource->spawn(RESOURCE_RED, managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
       for (int i=0; i<num_fuel; i++){
-        resources->spawn(FUEL, free_cells->pop_random());
+        managers.resource->spawn(FUEL, managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
       for (int i=0; i<num_obstacles; i++){
-        std::pair<float,float> pos = free_cells->cell_to_pos(free_cells->pop_random());
-        auto obstacle = std::make_shared<Entity>(pos.first, pos.second, 0.0, 0.0, 0.5, OBSTACLE);
-        obstacle->collides_with_entities = true;
-        entities->push_back(obstacle);
+        managers.obstacle->spawn(managers.cell->cell_to_pos(managers.cell->pop_random()));
       }
 
     }
@@ -844,15 +1243,15 @@ public:
   class InitLocatorSymmetric : public InitLocator {
 
   public:
-    InitLocatorSymmetric(std::shared_ptr<CellManager> &_free_cells, std::vector<std::shared_ptr<Entity> > *_entities, std::shared_ptr<ResourceManager> &_resources) : InitLocator(_free_cells, _entities, _resources){
+    InitLocatorSymmetric(const Managers &_managers, std::vector<std::shared_ptr<Entity> > *_entities) : InitLocator(_managers, _entities){
     }
 
     // virtual void init(const std::shared_ptr<Entity> &agent, const std::vector<std::pair<int,int> > &spawn_list) override{
     virtual void init(const std::shared_ptr<Ship> &ship, GameOptions &options) override{
 
 
-      std::pair<float,float> mirror_pos = free_cells->get_center();
-      std::pair<float,float> agent_pos = free_cells->cell_to_pos(free_cells->pop_random());
+      std::pair<float,float> mirror_pos = managers.cell->get_center();
+      std::pair<float,float> agent_pos = managers.cell->cell_to_pos(managers.cell->pop_random());
       ship->set_pose(agent_pos, mirror_pos);
 
       int num_greens = options.get<int32_t>("num_resources_green");
@@ -861,8 +1260,6 @@ public:
       int num_obstacles = options.get<int32_t>("num_obstacles");
       int num_red_goals = options.get<int32_t>("num_goals_red");
       int num_green_goals = options.get<int32_t>("num_goals_green");
-      float goal_max = options.get<float>("goal_max");
-      float goal_init = options.get<float>("goal_init");
 
 
       fassert(num_red_goals==num_green_goals);
@@ -872,56 +1269,101 @@ public:
 
       for (auto i = 0; i < num_green_goals; i++){
 
-        auto pair = free_cells->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities);
-        std::pair<float,float> goal_green_pos = pair.first;
-        std::pair<float,float> goal_red_pos = pair.second;
+        auto pair = managers.cell->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+        managers.goal->spawn(GOAL_GREEN, pair.first);
+        managers.goal->spawn(GOAL_RED, pair.second);
 
-        auto goal_green = std::make_shared<Goal>(goal_init, goal_max/1000.0, goal_max, goal_green_pos.first, goal_green_pos.second, 0.0, 0.0, 0.5, GOAL_GREEN);
-        goal_green->collides_with_entities = true;
-        goal_green->add_resource_type(RESOURCE_GREEN);
-        entities->push_back(goal_green);
-
-        auto goal_red = std::make_shared<Goal>(goal_init, goal_max/1000.0, goal_max, goal_red_pos.first, goal_red_pos.second, 0.0, 0.0, 0.5, GOAL_RED);
-        goal_red->collides_with_entities = true;
-        goal_red->add_resource_type(RESOURCE_RED);
-        entities->push_back(goal_red);
       }
 
       for (auto i = 0; i < num_greens; i++){
-        auto pair = free_cells->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities);
-        std::pair<float,float> green_pos = pair.first;
-        std::pair<float,float> red_pos = pair.second;
-
-        resources->spawn(RESOURCE_GREEN, green_pos);
-        resources->spawn(RESOURCE_RED, red_pos);
+        auto pair = managers.cell->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+        managers.resource->spawn(RESOURCE_GREEN, pair.first);
+        managers.resource->spawn(RESOURCE_RED, pair.second);
       }
 
       for (auto i = 0; i < num_fuel/2.0; i++){
-        auto pair = free_cells->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities);
-        std::pair<float,float> a_pos = pair.first;
-        std::pair<float,float> b_pos = pair.second;
-
-        resources->spawn(FUEL, a_pos);
-        resources->spawn(FUEL, b_pos);
+        auto pair = managers.cell->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+        managers.resource->spawn(FUEL, pair.first);
+        managers.resource->spawn(FUEL, pair.second);
       }
 
       for (auto i = 0; i < num_obstacles/2.0; i++){
-        auto pair = free_cells->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities);
-        std::pair<float,float> a_pos = pair.first;
-        std::pair<float,float> b_pos = pair.second;
-
-        auto a_obstacle = std::make_shared<Entity>(a_pos.first, a_pos.second, 0.0, 0.0, 0.5, OBSTACLE);
-        a_obstacle->collides_with_entities = true;
-        entities->push_back(a_obstacle);
-
-        auto b_obstacle = std::make_shared<Entity>(b_pos.first, b_pos.second, 0.0, 0.0, 0.5, OBSTACLE);
-        b_obstacle->collides_with_entities = true;
-        entities->push_back(b_obstacle);
+        auto pair = managers.cell->get_mirrored_pair(mirror_pos, agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+        managers.obstacle->spawn(pair.first);
+        managers.obstacle->spawn(pair.second);
       }
 
     }
 
   };
+
+
+    class InitLocatorInLine : public InitLocator {
+
+    public:
+      InitLocatorInLine(const Managers &_managers, std::vector<std::shared_ptr<Entity> > *_entities) : InitLocator(_managers, _entities){
+      }
+
+      // virtual void init(const std::shared_ptr<Entity> &agent, const std::vector<std::pair<int,int> > &spawn_list) override{
+      virtual void init(const std::shared_ptr<Ship> &ship, GameOptions &options) override{
+
+
+
+        std::pair<float,float> agent_pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_max_distance_from(managers.cell->get_center(), 3.0, managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0-2.0));
+
+        int num_greens = options.get<int32_t>("num_resources_green");
+        int num_reds = options.get<int32_t>("num_resources_red");
+        int num_fuel = options.get<int32_t>("num_fuel");
+        int num_obstacles = options.get<int32_t>("num_obstacles");
+        int num_red_goals = options.get<int32_t>("num_goals_red");
+        int num_green_goals = options.get<int32_t>("num_goals_green");
+
+
+        fassert(num_red_goals==num_green_goals);
+        fassert(num_reds==num_greens);
+        fassert(num_fuel % 2 == 0);
+        fassert(num_obstacles % 2 == 0);
+
+
+        std::vector<std::pair<float,float>> green_goals;
+        for (auto i = 0; i < num_green_goals; i++){
+
+          auto green_goal_pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_min_max_distance_from(agent_pos, 8.0, entities, 2.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+          auto red_goal_pos = managers.cell->cell_to_pos(managers.cell->pop_random_in_line(agent_pos, green_goal_pos, entities, 2.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+
+          auto green_goal = managers.goal->spawn(GOAL_GREEN, green_goal_pos);
+          auto green_red = managers.goal->spawn(GOAL_RED, red_goal_pos);
+          green_goal->add_ignore_type(RESOURCE_RED);
+          green_red->add_ignore_type(RESOURCE_GREEN);
+          green_goals.push_back(green_goal_pos);
+        }
+
+
+
+
+        for (auto i = 0; i < num_greens; i++){
+          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+          managers.resource->spawn(RESOURCE_GREEN, pair.first);
+          managers.resource->spawn(RESOURCE_RED, pair.second);
+        }
+
+        for (auto i = 0; i < num_fuel/2.0; i++){
+          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+          managers.resource->spawn(FUEL, pair.first);
+          managers.resource->spawn(FUEL, pair.second);
+        }
+
+        for (auto i = 0; i < num_obstacles/2.0; i++){
+          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
+          managers.obstacle->spawn(pair.first);
+          managers.obstacle->spawn(pair.second);
+        }
+
+        ship->set_pose(agent_pos, green_goals[0]);
+
+      }
+
+    };
 
 
 
@@ -935,19 +1377,25 @@ public:
     int stat_dim;
     int bottom_dim;
 
-    std::shared_ptr<CellManager> free_cell_manager;
-    std::shared_ptr<ResourceManager> resource_manager;
+    Managers managers;
+
     std::shared_ptr<InitLocator> init_locator;
 
-    std::vector<float> state;
+    std::vector<float> state_ship;
+    std::vector<float> state_goals;
+    std::vector<float> state_resources;
+    std::vector<float> state_obstacles;
+
     std::map<std::shared_ptr<Entity>,int> entity_to_state_idx;
     std::vector<int> hack_state_make_null_indices;
 
 
     Collector() : BasicAbstractGame() {
 
-      register_info_buffer("state");
-      register_info_buffer("state_description");
+      register_obs_buffer("state_ship");
+      register_obs_buffer("state_goals");
+      register_obs_buffer("state_resources");
+      register_obs_buffer("state_obstacles");
 
       options.register_option<int32_t>("world_dim",16);
       options.register_option<int32_t>("init_locator_type",2);
@@ -1005,7 +1453,7 @@ public:
           step_data.reward += ship->resources->consume(resource) * ((obj->type == RESOURCE_GREEN) ? 1.0 : -1.0);
           if(resource->get_value() <= 0.0){
             resource->disappear();
-            resource_manager->respawn(resource);
+            managers.resource->respawn(resource);
           }
 
         }else if(obj->type == FUEL){
@@ -1015,7 +1463,7 @@ public:
           ship->fuel->consume_greedy(resource);
           if(resource->get_value() <= 0.0){
             resource->disappear();
-            resource_manager->respawn(resource);
+            managers.resource->respawn(resource);
           }
         }else if(obj->type == GOAL_GREEN){
           auto goal = std::static_pointer_cast<Goal>(obj);
@@ -1133,15 +1581,20 @@ public:
 
       mixrate = 0.9f;
       room_manager = std::make_unique<RoomGenerator>(this);
-      free_cell_manager = std::make_shared<CellManager>(&rand_gen);
-      resource_manager = std::make_shared<ResourceManager>(free_cell_manager, &entities);
+      managers.cell = std::make_shared<CellManager>(&rand_gen);
+      managers.goal = std::make_shared<GoalManager>(&entities, options.get<float>("goal_init"), options.get<float>("goal_max")/1000.0, options.get<float>("goal_max"));
+      managers.resource = std::make_shared<ResourceManager>(&entities);
+      managers.obstacle = std::make_shared<ObstacleManager>(&entities);
 
       switch (options.get<int32_t>("init_locator_type")){
           case 1:
-              init_locator = std::make_shared<InitLocatorRandom>(free_cell_manager, &entities, resource_manager);
+              init_locator = std::make_shared<InitLocatorRandom>(managers, &entities);
             break;
           case 2:
-              init_locator = std::make_shared<InitLocatorSymmetric>(free_cell_manager, &entities, resource_manager);
+              init_locator = std::make_shared<InitLocatorSymmetric>(managers, &entities);
+            break;
+          case 3:
+              init_locator = std::make_shared<InitLocatorInLine>(managers, &entities);
             break;
 
           default:
@@ -1157,19 +1610,15 @@ public:
 
         options.center_agent = false;
 
-        ship->reset(agent);
-
-
-
         out_of_bounds_object = CAVEWALL;
 
         std::vector<int> space;
-        float x_center = main_width/2.0;
-        float y_center = world_dim/2.0 + bottom_dim;
+        float x_center = float(main_width)/2.0;
+        float y_center = float(world_dim)/2.0 + bottom_dim;
         for (int i = 0; i < grid_size; i++) {
             float x = (i % main_width) + .5;
             float y = (i / main_height) + .5;
-            if(sqrt(pow(x-x_center,2)+pow(y-y_center,2)) >= world_dim/2.0){
+            if(sqrt(pow(x-x_center,2)+pow(y-y_center,2)) >= float(world_dim)/2.0){
               set_obj(i, CAVEWALL);
             }else{
               set_obj(i, SPACE);
@@ -1177,98 +1626,141 @@ public:
             }
         }
 
-        free_cell_manager->reset(main_width,main_height);
-        free_cell_manager->add_cells(space.begin(),space.end());
-        free_cell_manager->randomize();
+        managers.cell->reset(main_width,main_height);
+        managers.cell->add_cells(space.begin(),space.end());
+        managers.cell->randomize();
+
+        ship->reset(agent);
+        managers.goal->reset();
+        managers.resource->reset();
+        managers.obstacle->reset();
 
         init_locator->init(ship, options);
 
 
 
-        int num_goals_green = options.get<int32_t>("num_goals_green");
-        int num_goals_red = options.get<int32_t>("num_goals_red");
-        int num_resources_green = options.get<int32_t>("num_resources_green");
-        int num_resources_red = options.get<int32_t>("num_resources_red");
-        int num_fuel = options.get<int32_t>("num_fuel");
-        int num_obstacles = options.get<int32_t>("num_obstacles");
+        // int num_goals_green = options.get<int32_t>("num_goals_green");
+        // int num_goals_red = options.get<int32_t>("num_goals_red");
+        // int num_resources_green = options.get<int32_t>("num_resources_green");
+        // int num_resources_red = options.get<int32_t>("num_resources_red");
+        // int num_fuel = options.get<int32_t>("num_fuel");
+        // int num_obstacles = options.get<int32_t>("num_obstacles");
 
 
-        int goals_green_offset = 9;
-        int goals_red_offset = goals_green_offset + num_goals_green*3;
-        int resources_green_offset = goals_red_offset + num_goals_red*3;
-        int resources_red_offset = resources_green_offset + num_resources_green*3;
-        int fuel_offset = resources_red_offset + num_resources_red*3;
-        int obstacles_offset = fuel_offset + num_fuel*3;
+        // int goals_green_offset = 9;
+        // int goals_red_offset = goals_green_offset + num_goals_green*3;
+        // int resources_green_offset = goals_red_offset + num_goals_red*3;
+        // int resources_red_offset = resources_green_offset + num_resources_green*3;
+        // int fuel_offset = resources_red_offset + num_resources_red*3;
+        // int obstacles_offset = fuel_offset + num_fuel*3;
 
 
-        state.clear();
-        entity_to_state_idx.clear();
-        hack_state_make_null_indices.clear();
+        // entity_to_state_idx.clear();
+        // hack_state_make_null_indices.clear();
+        // state.resize(obstacles_offset+num_obstacles*3,0.0);
 
-        state.resize(obstacles_offset+num_obstacles*3,0.0);
+        state_ship.clear();
+        state_goals.clear();
+        state_resources.clear();
+        state_obstacles.clear();
+        ship->push_state_to_vector(state_ship);
+        managers.goal->push_state_to_vector(state_goals);
+        managers.resource->push_state_to_vector(state_resources);
+        managers.obstacle->push_state_to_vector(state_obstacles);
 
-        state[0] = agent->x;
-        state[1] = agent->y;
-        state[2] = agent->rotation;
-        state[3] = agent->vx;
-        state[4] = agent->vy;
-        state[5] = agent->vrot;
-        state[6] = ship->fuel->get_value();
-        state[7] = ship->resources->get_value(RESOURCE_GREEN);
-        state[8] = ship->resources->get_value(RESOURCE_RED);
-
-
-        // std::cout << "AAA" << std::endl;
-        // for (auto xxx : entity_to_state_idx){
-        //   std::cout << "\t " << xxx.first << "[ " << xxx.first->type << "] : " << xxx.second << std::endl;
-        // }
-        //
-        // std::cout << "BBB" << std::endl;
-        for (auto ent : entities){
-          if (ent->type == GOAL_GREEN){
-            entity_to_state_idx[ent] = goals_green_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            auto goal = std::static_pointer_cast<Goal>(ent);
-            state[entity_to_state_idx[ent]+2] = goal->get_value();
-            goals_green_offset += 3;
-          }else if (ent->type == GOAL_RED){
-            entity_to_state_idx[ent] = goals_red_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            auto goal = std::static_pointer_cast<Goal>(ent);
-            state[entity_to_state_idx[ent]+2] = goal->get_value();
-            goals_red_offset += 3;
-          }else if (ent->type == RESOURCE_GREEN){
-            entity_to_state_idx[ent] = resources_green_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            state[entity_to_state_idx[ent]+2] = 1.0;
-            hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
-            resources_green_offset += 3;
-          }else if (ent->type == RESOURCE_RED){
-            entity_to_state_idx[ent] = resources_red_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            state[entity_to_state_idx[ent]+2] = 1.0;
-            hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
-            resources_red_offset += 3;
-          }else if (ent->type == FUEL){
-            entity_to_state_idx[ent] = fuel_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            state[entity_to_state_idx[ent]+2] = 1.0;
-            hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
-            fuel_offset += 3;
-          }else if (ent->type == OBSTACLE){
-            entity_to_state_idx[ent] = obstacles_offset;
-            state[entity_to_state_idx[ent]] = ent->x;
-            state[entity_to_state_idx[ent]+1] = ent->y;
-            state[entity_to_state_idx[ent]+2] = 1.0;
-            hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
-            obstacles_offset += 3;
+        auto ptr_state_ship_obs = point_to_obs<float>("state_ship");
+        if (ptr_state_ship_obs != 0){
+          for (uint32_t i =0; i < state_ship.size(); i++){
+            ptr_state_ship_obs[i] = state_ship[i];
           }
         }
+
+        auto ptr_state_goals_obs = point_to_obs<float>("state_goals");
+        if (ptr_state_goals_obs != 0){
+          for (uint32_t i =0; i < state_goals.size(); i++){
+            ptr_state_goals_obs[i] = state_goals[i];
+          }
+        }
+
+        auto ptr_state_resources_obs = point_to_obs<float>("state_resources");
+        if (ptr_state_resources_obs != 0){
+          for (uint32_t i =0; i < state_resources.size(); i++){
+            ptr_state_resources_obs[i] = state_resources[i];
+          }
+        }
+
+        auto ptr_state_obstacles_obs = point_to_obs<float>("state_obstacles");
+        if (ptr_state_obstacles_obs != 0){
+          for (uint32_t i =0; i < state_obstacles.size(); i++){
+            ptr_state_obstacles_obs[i] = state_obstacles[i];
+          }
+        }
+
+
+
+        //
+        // state[0] = agent->x;
+        // state[1] = agent->y;
+        // state[2] = agent->rotation;
+        // state[3] = agent->vx;
+        // state[4] = agent->vy;
+        // state[5] = agent->vrot;
+        // state[6] = ship->fuel->get_value();
+        // state[7] = ship->resources->get_value(RESOURCE_GREEN);
+        // state[8] = ship->resources->get_value(RESOURCE_RED);
+        //
+        //
+        // // std::cout << "AAA" << std::endl;
+        // // for (auto xxx : entity_to_state_idx){
+        // //   std::cout << "\t " << xxx.first << "[ " << xxx.first->type << "] : " << xxx.second << std::endl;
+        // // }
+        // //
+        // // std::cout << "BBB" << std::endl;
+        // for (auto ent : entities){
+        //   if (ent->type == GOAL_GREEN){
+        //     entity_to_state_idx[ent] = goals_green_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     auto goal = std::static_pointer_cast<Goal>(ent);
+        //     state[entity_to_state_idx[ent]+2] = goal->get_value();
+        //     goals_green_offset += 3;
+        //   }else if (ent->type == GOAL_RED){
+        //     entity_to_state_idx[ent] = goals_red_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     auto goal = std::static_pointer_cast<Goal>(ent);
+        //     state[entity_to_state_idx[ent]+2] = goal->get_value();
+        //     goals_red_offset += 3;
+        //   }else if (ent->type == RESOURCE_GREEN){
+        //     entity_to_state_idx[ent] = resources_green_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     state[entity_to_state_idx[ent]+2] = 1.0;
+        //     hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
+        //     resources_green_offset += 3;
+        //   }else if (ent->type == RESOURCE_RED){
+        //     entity_to_state_idx[ent] = resources_red_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     state[entity_to_state_idx[ent]+2] = 1.0;
+        //     hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
+        //     resources_red_offset += 3;
+        //   }else if (ent->type == FUEL){
+        //     entity_to_state_idx[ent] = fuel_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     state[entity_to_state_idx[ent]+2] = 1.0;
+        //     hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
+        //     fuel_offset += 3;
+        //   }else if (ent->type == OBSTACLE){
+        //     entity_to_state_idx[ent] = obstacles_offset;
+        //     state[entity_to_state_idx[ent]] = ent->x;
+        //     state[entity_to_state_idx[ent]+1] = ent->y;
+        //     state[entity_to_state_idx[ent]+2] = 1.0;
+        //     hack_state_make_null_indices.push_back(entity_to_state_idx[ent]+2);
+        //     obstacles_offset += 3;
+        //   }
+        // }
 
 
         // std::cout << "CCC" << std::endl;
@@ -1320,9 +1812,9 @@ public:
         // }
         //
         // std::cout << "hack" << std::endl;
-        for (auto i : hack_state_make_null_indices){
-          state[i] = 0.0;
-        }
+        // for (auto i : hack_state_make_null_indices){
+        //   state[i] = 0.0;
+        // }
 
         // std::cout << "post hack" << std::endl;
         // for (auto xxx : entity_to_state_idx){
@@ -1334,16 +1826,6 @@ public:
         // }
 
 
-        state[0] = agent->x;
-        state[1] = agent->y;
-        state[2] = agent->rotation;
-        state[3] = agent->vx;
-        state[4] = agent->vy;
-        state[5] = agent->vrot;
-        state[6] = ship->fuel->get_value();
-        state[7] = ship->resources->get_value(RESOURCE_GREEN);
-        state[8] = ship->resources->get_value(RESOURCE_RED);
-
         for (auto ent : entities){
           if ((ent->type == GOAL_RED) || (ent->type == GOAL_GREEN)) {
             auto goal = std::static_pointer_cast<Goal>(ent);
@@ -1351,25 +1833,33 @@ public:
               step_data.done = true;
               step_data.level_complete = true;
             }
-
           }
-
-
-          auto it = entity_to_state_idx.find(ent);
-          if (it != entity_to_state_idx.end()){
-            int sdx = entity_to_state_idx[ent];
-            if((state[sdx] != ent->x) ||(state[sdx+1] != ent->y)){
-              std::cout << "sw ent[" << ent << "|" << sdx << "] " << state[sdx] << "<>" << ent->x << " " << state[sdx+1] << "<>" << ent->y << std::endl;
-              fassert(false);
-            }
-            if ((ent->type == GOAL_RED) || (ent->type == GOAL_GREEN)) {
-              auto goal = std::static_pointer_cast<Goal>(ent);
-              state[sdx+2] = goal->get_value();
-            }else{
-              state[sdx+2] = 1.0;
-            }
-          }
+          //
+          // auto it = entity_to_state_idx.find(ent);
+          // if (it != entity_to_state_idx.end()){
+          //   int sdx = entity_to_state_idx[ent];
+          //   if((state[sdx] != ent->x) ||(state[sdx+1] != ent->y)){
+          //     std::cout << "sw ent[" << ent << "|" << sdx << "] " << state[sdx] << "<>" << ent->x << " " << state[sdx+1] << "<>" << ent->y << std::endl;
+          //     fassert(false);
+          //   }
+          //   if ((ent->type == GOAL_RED) || (ent->type == GOAL_GREEN)) {
+          //     auto goal = std::static_pointer_cast<Goal>(ent);
+          //     state[sdx+2] = goal->get_value();
+          //   }else{
+          //     state[sdx+2] = 1.0;
+          //   }
+          // }
         }
+
+        state_ship.clear();
+        state_goals.clear();
+        state_resources.clear();
+        state_obstacles.clear();
+
+        ship->push_state_to_vector(state_ship);
+        managers.goal->push_state_to_vector(state_goals);
+        managers.resource->push_state_to_vector(state_resources);
+        managers.obstacle->push_state_to_vector(state_obstacles);
 
 
         // std::cout << "post loop" << std::endl;
@@ -1382,12 +1872,34 @@ public:
         //   std::cout << "ent [?|"<<i<<"] " << state[i] << " " << state[i+1] << ": " << state[i+2] << std::endl;
         // }
 
-        auto ptr_state_info = point_to_info<float>("state");
-        if (ptr_state_info != 0){
-          for (uint32_t i =0; i < state.size(); i++){
-            ptr_state_info[i] = state[i];
+        auto ptr_state_ship_obs = point_to_obs<float>("state_ship");
+        if (ptr_state_ship_obs != 0){
+          for (uint32_t i =0; i < state_ship.size(); i++){
+            ptr_state_ship_obs[i] = state_ship[i];
           }
         }
+
+        auto ptr_state_goals_obs = point_to_obs<float>("state_goals");
+        if (ptr_state_goals_obs != 0){
+          for (uint32_t i =0; i < state_goals.size(); i++){
+            ptr_state_goals_obs[i] = state_goals[i];
+          }
+        }
+
+        auto ptr_state_resources_obs = point_to_obs<float>("state_resources");
+        if (ptr_state_resources_obs != 0){
+          for (uint32_t i =0; i < state_resources.size(); i++){
+            ptr_state_resources_obs[i] = state_resources[i];
+          }
+        }
+
+        auto ptr_state_obstacles_obs = point_to_obs<float>("state_obstacles");
+        if (ptr_state_obstacles_obs != 0){
+          for (uint32_t i =0; i < state_obstacles.size(); i++){
+            ptr_state_obstacles_obs[i] = state_obstacles[i];
+          }
+        }
+
 
         erase_if_needed();
     }

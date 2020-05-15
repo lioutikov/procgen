@@ -51,7 +51,6 @@ class VecRecorder():
                 fps=tps,
                 quality=9,
             )
-            print(f"OPENING {f'{self._base_name}{name}.mp4'}")
 
         def new_data_field(self, name):
             assert name not in self._data
@@ -88,8 +87,6 @@ class VecRecorder():
 
         elif counter is not None:
             self._counter = counter;
-
-        print(f"COUNTER = {self._counter}")
 
     def new_recording(self, reopen):
 

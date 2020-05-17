@@ -12,12 +12,14 @@ class ProcgenInteractive(Interactive):
     Interactive version of Procgen environments for humans to use
     """
 
-    def __init__(self, vision, sync=False, **kwargs):
+    def __init__(self, vision, sync=False, recorder=None, **kwargs):
         self._vision = vision
         venv = ProcgenEnv(num_envs=1, **kwargs)
         self.combos = list(venv.unwrapped.combos)
         self.last_keys = []
         env = Scalarize(venv)
+        if recorder is not None:
+            env = recorder(env)
         super().__init__(env=env, sync=sync, tps=15, display_info=True)
 
     def get_image(self, obs, env):

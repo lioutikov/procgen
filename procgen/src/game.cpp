@@ -22,7 +22,7 @@ void bgr32_to_rgb888(void *dst_rgb888, void *src_bgr32, int w, int h) {
 Game::Game() {
     timeout = 1000;
     episodes_remaining = 0;
-    last_ep_reward = 0;
+    // last_ep_reward = 0;
     last_reward = -1;
     default_action = 0;
     fixed_asset_seed = 0;
@@ -142,9 +142,18 @@ void Game::reset() {
     total_reward = 0;
     episodes_remaining -= 1;
     action = default_action;
+
+    _was_reset = true;
+}
+
+bool Game::was_reset(){
+    return _was_reset;
 }
 
 void Game::step() {
+
+    fassert(_was_reset);
+
     cur_time += 1;
     bool will_force_reset = false;
 
@@ -168,19 +177,24 @@ void Game::step() {
 
     int level_seed = current_level_seed;
 
-    if (step_data.done) {
-        last_ep_reward = total_reward;
-        reset();
-    }
+    // if (step_data.done) {
+    //     // last_ep_reward = total_reward;
+    //     reset();
+    // }
 
     if (options.use_sequential_levels && step_data.level_complete) {
-        step_data.done = false;
+        if (step_data.done) {
+          reset();
+          step_data.done = false;
+        }
     }
 
-    episode_done = step_data.done;
+    // episode_done = step_data.done;
     if (step_data.done){
       num_episodes_done++;
     }
+
+    _was_reset = !step_data.done;
 
     auto ptr = point_to_obs<uint8_t>("rgb");
     if (ptr != 0){

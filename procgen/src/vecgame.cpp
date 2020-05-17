@@ -85,11 +85,18 @@ int libenv_add_space(libenv_venv *env, enum libenv_spaces_name name, struct libe
   return venv->add_space(name, sp);
 }
 
-void libenv_reset(libenv_venv *env, struct libenv_step *step) {
+// void libenv_reset(libenv_venv *env, struct libenv_step *step) {
+//     auto venv = (VecGame *)(env);
+//     auto obs = convert_bufs(step->obs, venv->num_envs,
+//                             venv->observation_spaces.size());
+//     venv->reset(obs);
+// }
+
+void libenv_reset(libenv_venv *env, const bool *reset_game, struct libenv_step *step) {
     auto venv = (VecGame *)(env);
     auto obs = convert_bufs(step->obs, venv->num_envs,
                             venv->observation_spaces.size());
-    venv->reset(obs);
+    venv->reset(reset_game, obs);
 }
 
 void libenv_step_async(libenv_venv *env, const void **acts,
@@ -357,21 +364,35 @@ int VecGame::add_space(int space_identifier, struct libenv_space *sp){
   }
 }
 
-void VecGame::reset(const std::vector<std::vector<void *>> &obs) {
-    if (!first_reset) {
-        printf("WARNING: Procgen ignores resets, please create a new environment "
-               "instead\n");
-    }
-    first_reset = false;
+// void VecGame::reset(const std::vector<std::vector<void *>> &obs) {
+//     // if (!first_reset) {
+//     //     printf("WARNING: Procgen ignores resets, please create a new environment "
+//     //            "instead\n");
+//     // }
+//     // first_reset = false;
+//     // wait_for_stepping_threads();
+//     // for (int e = 0; e < num_envs; e++) {
+//     //     const auto &game = games[e];
+//     //     // game->render_to_buf(game->render_buf, RES_W, RES_H, false);
+//     //     // bgr32_to_rgb888(obs[e][0], game->render_buf, RES_W, RES_H);
+//     //
+//     //     game->connect_obs_buffer(observation_spaces, obs[e]);
+//     //     game->reset();
+//     // }
+//
+//     bool reset_game[num_envs] = { true };
+//     reset(&reset_game, obs);
+// }
+
+void VecGame::reset(const bool *reset_game, const std::vector<std::vector<void *>> &obs) {
     wait_for_stepping_threads();
     for (int e = 0; e < num_envs; e++) {
+        if (!reset_game[e]){
+          continue;
+        }
         const auto &game = games[e];
-        // game->render_to_buf(game->render_buf, RES_W, RES_H, false);
-        // bgr32_to_rgb888(obs[e][0], game->render_buf, RES_W, RES_H);
-
         game->connect_obs_buffer(observation_spaces, obs[e]);
         game->reset();
-
     }
 }
 
@@ -395,7 +416,13 @@ void VecGame::step_async(const std::vector<int32_t> &acts,
 
         for (int e = 0; e < num_envs; e++) {
             const auto &game = games[e];
+            // std::cout << "ENVNR " << e << " " << game->get_num_episodes_done() << "/" << max_episodes_per_game[e] << std::endl;
             if ((max_episodes_per_game[e] > 0) &&  (game->get_num_episodes_done() >= max_episodes_per_game[e])){
+              continue;
+            }
+            // std::cout << "NO MAXED YET " << std::endl;
+            if(!game->was_reset()){
+              // std::cout << "BUT NOT RESET EITHER!" << std::endl;
               continue;
             }
             game->action = acts[e];

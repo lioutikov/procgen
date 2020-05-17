@@ -64,7 +64,7 @@ def main():
         obs, rew, done, info = env.step(np.array([env.action_space.sample()]))
         print(f"step {step} reward {rew} done {done}")
         print(info['state'])
-        print(env.P)
+        # print(env.P)
         step += 1
         if done:
             break

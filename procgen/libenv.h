@@ -158,7 +158,8 @@ LIBENV_API int libenv_get_spaces(libenv_venv *handle, enum libenv_spaces_name na
 
 // libenv_reset resets the environment to the starting state
 // the step object belongs to the caller, along with the obs buffer which must be allocated by the caller
-LIBENV_API void libenv_reset(libenv_venv *handle, struct libenv_step *step);
+// LIBENV_API void libenv_reset(libenv_venv *handle, struct libenv_step *step);
+LIBENV_API void libenv_reset(libenv_venv *handle, const bool* reset_game, struct libenv_step *step);
 
 // libenv_step_async submits an action to the environment, but doesn't wait for it to complete
 //

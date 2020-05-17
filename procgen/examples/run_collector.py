@@ -5,22 +5,13 @@ from procgen import ProcgenEnv
 
 import numpy as np
 
-from procgen.recorder import SingleRecorder, VecRecorder
+from procgen.recorder import RecorderWrapper
 
 import argparse
 
+import gym
 
 def run_collector_ia(vision, sync, level_seed, record_dir, record_prefix, options):
-
-    # to start recording call the script with "--record-dir <your recdir>"
-    recorder = None
-    if record_dir is not None:
-        recorder = SingleRecorder(record_dir, prefix=f"{record_prefix}_{level_seed}")
-        recorder.record_obs_as("state_ship","state_ship")
-        recorder.record_obs_as("state_goals","state_goals")
-        recorder.record_obs_as("state_resources","state_resources")
-        recorder.record_obs_as("state_obstacles","state_obstacles")
-        recorder.record_obs_as("rgb","rgb")
 
 
     kwargs = {
@@ -35,22 +26,23 @@ def run_collector_ia(vision, sync, level_seed, record_dir, record_prefix, option
         "options": options
         }
 
-    ia = ProcgenInteractive(vision, sync, env_name="collector", **kwargs)
-    ia.run(record_dir=record_dir, recorder=recorder)
+    # to start recording call the script with "--record-dir <your recdir>"
+    recorder = None
+    if record_dir is not None:
+        recorder = RecorderWrapper(record_dir, prefix=f"{record_prefix}_{level_seed}")
+        recorder.record_obs_as("state_ship","state_ship")
+        recorder.record_obs_as("state_goals","state_goals")
+        recorder.record_obs_as("state_resources","state_resources")
+        recorder.record_obs_as("state_obstacles","state_obstacles")
+        recorder.record_obs_as("rgb","rgb")
+
+    ia = ProcgenInteractive(vision, sync, recorder=recorder, env_name="collector", **kwargs)
+    ia.run()
 
 
 def run_collector_env_vector(num_trials, parallel_envs, level_seed, do_render, record_dir, record_prefix, options):
 
     for seed in level_seed:
-        recorder = None
-        if record_dir is not None:
-            recorder = VecRecorder(parallel_envs, record_dir, prefix=f"{record_prefix}_{seed}")
-            recorder.record_obs_as("state_ship","state_ship")
-            recorder.record_obs_as("state_goals","state_goals")
-            recorder.record_obs_as("state_resources","state_resources")
-            recorder.record_obs_as("state_obstacles","state_obstacles")
-            recorder.record_obs_as("rgb","rgb")
-            recorder.new_recording([True for _ in range(parallel_envs)])
 
         kwargs = {
             "start_level": seed,
@@ -67,34 +59,104 @@ def run_collector_env_vector(num_trials, parallel_envs, level_seed, do_render, r
 
         env = ProcgenEnv(num_envs=parallel_envs, env_name="collector", **kwargs)
 
+        if record_dir is not None:
+            recorder = RecorderWrapper(record_dir, prefix=f"{record_prefix}_{seed}")
+            recorder.record_obs_as("state_ship","state_ship")
+            recorder.record_obs_as("state_goals","state_goals")
+            recorder.record_obs_as("state_resources","state_resources")
+            recorder.record_obs_as("state_obstacles","state_obstacles")
+            recorder.record_obs_as("rgb","rgb")
+
+            env = recorder(env)
+            # env = VecWrapper(record_dir, prefix=f"{record_prefix}_{seed}")
+
+
         policy = RandomPolicy(np.arange(9))
 
         obs = env.reset()
 
-        info = None
+        active = np.ones(parallel_envs, dtype=np.bool)
+        num_finished_episodes = np.zeros(parallel_envs)
 
-        all_done = [False]*parallel_envs
-
-        while not all(all_done):
+        finished = (num_finished_episodes >= num_trials)
+        while not finished.all():
 
             if do_render:
                 env.render()
 
-            if recorder is not None:
-                renders = env.get_images()
-
             action = np.array([policy(state) for state in obs['state_ship']])
 
-            next_obs, rew, done, next_info = env.step(action)
-            all_done = env.all_episodes_done()
+            obs, rew, done, info = env.step(action)
 
-            if recorder is not None:
-                recorder.new_entry(render=renders, obs=obs, rew=rew, done=done, info=info, action=action)
-                recorder.close(done)
-                recorder.new_recording(done & ~all_done)
+            for i, d in enumerate(done):
+                if d and active[i]:
+                    num_finished_episodes[i] += 1
+                    active[i] = False
 
-            obs = next_obs
-            info = next_info
+            finished = (num_finished_episodes >= num_trials)
+            # print(f"{active}\n{num_finished_episodes} >= {num_trials}\n{finished}\n\n")
+
+            obs = env.reset(done & ~finished)
+            for i,d in enumerate(done & ~finished):
+                if d:
+                    active[i] = True
+
+        env.close()
+
+
+def run_collector_env_gym(num_trials, level_seed, do_render, record_dir, record_prefix, options):
+
+    for seed in level_seed:
+
+        kwargs = {
+            "start_level": seed,
+            "num_levels": 1,
+            "additional_obs_spaces": [
+                ProcgenEnv.C_Space("state_ship", False, (9,), float, (-1e6,1e6)),
+                ProcgenEnv.C_Space("state_goals", False, ((options["num_goals_green"]+options["num_goals_red"])*4,), float, (-1e6,1e6)),
+                ProcgenEnv.C_Space("state_resources", False, ((options["num_resources_green"]+options["num_resources_red"])*4,), float, (-1e6,1e6)),
+                ProcgenEnv.C_Space("state_obstacles", False, (options["num_obstacles"]*3,), float, (-1e6,1e6))
+            ],
+            'max_episodes_per_game': num_trials,
+            "options": options
+            }
+
+        env = gym.make('procgen:procgen-collector-v0',**kwargs)
+
+        if record_dir is not None:
+            recorder = RecorderWrapper(record_dir, prefix=f"{record_prefix}_{seed}")
+            recorder.record_obs_as("obs","obs")
+            
+            env = recorder(env)
+            # env = VecWrapper(record_dir, prefix=f"{record_prefix}_{seed}")
+
+
+        policy = RandomPolicy(np.arange(9))
+
+        obs = env.reset()
+
+        active = True
+        num_finished_episodes = 0
+
+        finished = (num_finished_episodes >= num_trials)
+        while not finished:
+
+            if do_render:
+                env.render()
+
+            action = policy(obs)
+
+            obs, rew, done, info = env.step(action)
+
+            if done and active:
+                num_finished_episodes += 1
+                active = False
+
+            finished = (num_finished_episodes >= num_trials)
+
+            if done & ~finished:
+                obs = env.reset()
+                active = True
 
         env.close()
 
@@ -209,7 +271,7 @@ def main():
     parser.add_argument("--record-dir", help="directory to record data to")
     parser.add_argument("--record-prefix", default="rec", help="prefix for recordings")
     parser.add_argument('--mode', help="what mode are you playing?", choices=mode_options.keys(), default='default')
-    parser.add_argument('--policy', help="policy for the agent?", choices=['random','human'], default='random')
+    parser.add_argument('--policy', help="policy for the agent?", choices=['random','human','gym'], default='random')
     parser.add_argument('--level-seed', nargs='+', type=int, help='list of level seeds', default=[11])
     args = parser.parse_args()
 
@@ -222,13 +284,11 @@ def main():
         run_collector_ia(args.vision, args.do_sync, args.level_seed[0], args.record_dir, record_prefix, options)
     elif args.policy == 'random':
         run_collector_env_vector(args.num_trials, args.num_envs, args.level_seed, args.do_render, args.record_dir, record_prefix, options)
+    elif args.policy == "gym":
+        run_collector_env_gym(args.num_trials, args.level_seed, args.do_render, args.record_dir, record_prefix, options)
     else:
         print("Unknown policy")
         exit(-1)
-
-
-
-
 
 
 if __name__ == "__main__":

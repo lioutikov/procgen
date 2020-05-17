@@ -54,14 +54,12 @@ class Interactive(abc.ABC):
     """
 
     def __init__(self, env, sync=True, tps=60, aspect_ratio=None, display_info=False):
-        self.recorder = None
         self._episode = 0
         self._display_info = display_info
         self._seconds_to_display_done_info = 0
 
-        self._obs = env.reset()
-        self._info = None
-        self._image = self.get_image(self._obs, env)
+        obs = env.reset()
+        self._image = self.get_image(obs, env)
         assert (
             len(self._image.shape) == 3 and self._image.shape[2] == 3
         ), "must be an RGB image"
@@ -156,13 +154,9 @@ class Interactive(abc.ABC):
         )
 
         self._skip_info_out = []
-        self._step_cbs = []
 
     def skip_info_out(self, name):
         self._skip_info_out.append(name)
-
-    def add_step_callback(self, cb):
-        self._step_cbs.append(cb)
 
     def _update(self, dt):
         # if we're displaying done info, don't advance the simulation
@@ -212,25 +206,15 @@ class Interactive(abc.ABC):
                 if act is None:
                     act = 4
 
-                next_obs, rew, done, next_info = self._env.step(act)
-
-                if self.recorder is not None:
-
-                    self.recorder.new_entry(self._image, self._obs, rew, done, self._info, act)
+                obs, rew, done, info = self._env.step(act)
 
                 self._episode_return += rew
                 self._steps += 1
                 self._episode_steps += 1
 
-                for cb in self._step_cbs:
-                    cb(self._obs, rew, done, self._info, self._episode_steps, self._episode_return)
+                self._image = self.get_image(obs, self._env)
 
-                self._obs = next_obs
-                self._info = next_info
-
-                self._image = self.get_image(self._obs, self._env)
-
-                self._last_info = dict(episode_steps=self._episode_steps, episode_return=self._episode_return, **next_info)
+                self._last_info = dict(episode_steps=self._episode_steps, episode_return=self._episode_return, **info)
                 np.set_printoptions(precision=2)
                 done_int = int(done)  # shorter than printing True/False
                 if self._sync:
@@ -260,17 +244,13 @@ class Interactive(abc.ABC):
                     # )
 
                 if done:
-                    self._obs = self._env.reset()
-                    self._info = None
-                    self._image = self.get_image(self._obs, self._env)
+
+                    obs = self._env.reset()
+                    self._image = self.get_image(obs, self._env)
                     self._episode_steps = 0
                     self._episode_return = 0
                     self._prev_episode_return = 0
                     self._episode += 1
-
-                    if self.recorder is not None:
-                        self.recorder.close()
-                        self.recorder.new_recording()
 
                     # if self._movie_writer is not None:
                     #     self._restart_recording()
@@ -347,14 +327,10 @@ class Interactive(abc.ABC):
         For async environments, keys is a list of keys currently held down
         """
 
-    def run(self, record_dir=None, recorder = None):
+    def run(self):
         """
         Run the interactive window until the user quits
         """
-
-        if recorder is not None:
-            self.recorder = recorder
-            self.recorder.new_recording()
 
         # pyglet.app.run() has issues like https://bitbucket.org/pyglet/pyglet/issues/199/attempting-to-resize-or-close-pyglet
         # and also involves inverting your code to run inside the pyglet framework

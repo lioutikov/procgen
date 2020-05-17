@@ -15,7 +15,6 @@ class RemoveDictObs(ObservationWrapper):
 
 
 def make_env(**kwargs):
-    print(f"make_env kwargs: {kwargs}")
 
     obs_key = kwargs.pop("obs_key","rgb")
 

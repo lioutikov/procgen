@@ -428,13 +428,19 @@ class CVecEnv:
         # c spaces are aways a single-layer Dict space
         return gym.spaces.Dict(spaces)
 
-    def reset(self) -> Dict[str, np.ndarray]:
+    def reset(self, reset_game=None) -> Dict[str, np.ndarray]:
         """
         Reset the environment and return the first observation
         """
         self._state = STATE_WAIT_ACT
 
-        self._c_lib.libenv_reset(self._c_env, self._c_step)
+        if reset_game is None:
+            reset_game = np.array([True]*self.num_envs)
+        else:
+            reset_game = np.array(reset_game,dtype=np.bool,ndmin=1)
+
+        reset_game = self._ffi.cast("const bool *", reset_game.ctypes.data)
+        self._c_lib.libenv_reset(self._c_env, reset_game, self._c_step)
         return self._maybe_copy_dict(self._observations)
 
     def step_async(self, actions: np.ndarray) -> None:
@@ -491,7 +497,7 @@ class CVecEnv:
         self.step_async(actions)
         return self.step_wait()
 
-    def render(self, mode: str = "human") -> Union[bool, np.ndarray]:
+    def render(self, mode: str = None) -> Union[bool, np.ndarray]:
         """
         Render the environment.
 
@@ -502,6 +508,9 @@ class CVecEnv:
         that will be tiled as if it were an image by this code.  Call get_images() instead if
         that is not the behavior you want.
         """
+        if mode is None:
+            mode = "human"
+
         if (
             mode == "human"
             and "human" not in self.metadata["render.modes"]

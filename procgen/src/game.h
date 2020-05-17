@@ -225,9 +225,9 @@ class Game {
 
     int current_level_seed = 0;
     int episodes_remaining = 0;
-    bool episode_done = false;
+    // bool episode_done = false;
 
-    float last_ep_reward = 0.0f;
+    // float last_ep_reward = 0.0f;
     int last_reward_timer = 0;
     float last_reward = 0.0f;
     int default_action = 0;
@@ -252,8 +252,9 @@ class Game {
     std::map<std::string, GameSpaceBuffer> obs_buffers;
 
     Game();
-    void step();
     void reset();
+    bool was_reset();
+    void step();
     void render_to_buf(void *buf, int w, int h, bool antialias);
     void parse_options(std::string name, VecOptions opt_vec);
 
@@ -312,6 +313,7 @@ class Game {
     int get_num_episodes_done();
 
   private:
+    bool _was_reset = false;
     int reset_count = 0;
     int num_episodes_done = 0;
     float total_reward = 0.0f;

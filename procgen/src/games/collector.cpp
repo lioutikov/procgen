@@ -837,6 +837,16 @@ class Collector : public BasicAbstractGame {
       return goal;
     }
 
+    std::vector<std::shared_ptr<Goal>> get_goals(int goal_type){
+      std::vector<std::shared_ptr<Goal>> res;
+      for (auto goal : goals){
+        if (goal->type == goal_type){
+          res.push_back(goal);
+        }
+      }
+      return res;
+    }
+
     void reset(){
       goals.clear();
     }
@@ -1450,7 +1460,8 @@ public:
         if ((obj->type == RESOURCE_GREEN) || (obj->type == RESOURCE_RED)){
           auto resource = std::static_pointer_cast<Resource>(obj);
 
-          step_data.reward += ship->resources->consume(resource) * ((obj->type == RESOURCE_GREEN) ? 1.0 : -1.0);
+          float value = ship->resources->consume(resource);
+          step_data.reward += value * ((obj->type == RESOURCE_GREEN) ? 1.0 : -1.0);
           if(resource->get_value() <= 0.0){
             resource->disappear();
             managers.resource->respawn(resource);
@@ -1467,10 +1478,14 @@ public:
           }
         }else if(obj->type == GOAL_GREEN){
           auto goal = std::static_pointer_cast<Goal>(obj);
-          step_data.reward += goal->consume(ship->resources);
+          // goal->consume(ship->resources);
+          float value = goal->consume(ship->resources);
+          step_data.reward += value*100;
         }else if(obj->type == GOAL_RED){
           auto goal = std::static_pointer_cast<Goal>(obj);
-          step_data.reward -= goal->consume(ship->resources);
+          // goal->consume(ship->resources);
+          float value = goal->consume(ship->resources);
+          step_data.reward -= value*2*100;
         }
     }
 
@@ -1489,7 +1504,7 @@ public:
         }
 
         if (acc_mag > 0.0){
-          step_data.reward -= vel_mag;
+          // step_data.reward -= vel_mag;
           ship->fuel->withdraw(vel_mag);
         }
 
@@ -1794,7 +1809,17 @@ public:
     void game_step() override {
         BasicAbstractGame::game_step();
 
-        step_data.reward -= 0.1;
+        // for (auto goal : managers.goal->get_goals(GOAL_GREEN)){
+        //   step_data.reward -= sqrt(pow(agent->x-goal->x,2)+pow(agent->y-goal->y,2));
+        // }
+        //
+        // for (auto goal : managers.goal->get_goals(GOAL_RED)){
+        //   step_data.reward -= (float(world_dim) - sqrt(pow(agent->x-goal->x,2)+pow(agent->y-goal->y,2)))/float(world_dim);
+        //   step_data.reward -= goal->get_percentage();
+        // }
+
+        // step_data.reward -= (1.0-(ship->fuel->get_percentage()));
+        // step_data.reward -= 0.1;
 
 
         if (ship->fuel->get_value() < 0.0+1e-10){
@@ -1900,6 +1925,39 @@ public:
           }
         }
 
+
+        step_data.reward -= 10.0;
+
+        if (step_data.done){
+          step_data.reward -= (1.0-(ship->fuel->get_percentage()))*100;
+        }
+        // if (step_data.done){
+        //   // step_data.reward -= float(cur_time)/float(timeout)*10;
+        //   step_data.reward -= (1.0-(ship->fuel->get_percentage()));
+        //
+        //   for (auto goal : managers.goal->get_goals(GOAL_GREEN)){
+        //     step_data.reward -= (1.0-goal->get_percentage());
+        //   }
+        //
+        //   for (auto goal : managers.goal->get_goals(GOAL_RED)){
+        //     step_data.reward -= goal->get_percentage()*2.0;
+        //   }
+        //
+        //   if (step_data.done){
+        //     if (ship->fuel->get_percentage() < 0.05){
+        //       step_data.reward *= float(timeout-cur_time);
+        //     }else{
+        //       for (auto goal : managers.goal->get_goals(GOAL_RED)){
+        //         if (goal->get_percentage() >= 0.5){
+        //           step_data.reward *= float(timeout-cur_time);
+        //           break;
+        //         }
+        //       }
+        //     }
+        //   }
+        //
+        //   step_data.reward *= 10;
+        // // }
 
         erase_if_needed();
     }

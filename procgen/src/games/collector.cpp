@@ -213,6 +213,7 @@ class Collector : public BasicAbstractGame {
 
         // random offsets
         for(int roff : rand_gen->simple_choose(9,9)){
+          roff = 4; // HACK: make sure red is always in the way
           int xoff = (roff % 3) -1;
           int yoff = (roff / 3) -1;
 
@@ -1330,9 +1331,9 @@ public:
 
 
         fassert(num_red_goals==num_green_goals);
-        fassert(num_reds==num_greens);
-        fassert(num_fuel % 2 == 0);
-        fassert(num_obstacles % 2 == 0);
+        // fassert(num_reds==num_greens);
+        // fassert(num_fuel % 2 == 0);
+        // fassert(num_obstacles % 2 == 0);
 
 
         std::vector<std::pair<float,float>> green_goals;
@@ -1352,21 +1353,23 @@ public:
 
 
         for (auto i = 0; i < num_greens; i++){
-          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
-          managers.resource->spawn(RESOURCE_GREEN, pair.first);
-          managers.resource->spawn(RESOURCE_RED, pair.second);
+          auto pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_min_max_distance_from(agent_pos, 3.0, entities, 2.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+          managers.resource->spawn(RESOURCE_GREEN, pos);
         }
 
-        for (auto i = 0; i < num_fuel/2.0; i++){
-          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
-          managers.resource->spawn(FUEL, pair.first);
-          managers.resource->spawn(FUEL, pair.second);
+        for (auto i = 0; i < num_reds; i++){
+          auto pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_min_max_distance_from(agent_pos, 3.0, entities, 2.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+          managers.resource->spawn(RESOURCE_RED, pos);
         }
 
-        for (auto i = 0; i < num_obstacles/2.0; i++){
-          auto pair = managers.cell->get_mirrored_pair(green_goals[i%num_green_goals], agent_pos, 2.0, 2.0, entities, float(managers.cell->get_world_dim())/2.0 -2.0 );
-          managers.obstacle->spawn(pair.first);
-          managers.obstacle->spawn(pair.second);
+        for (auto i = 0; i < num_fuel; i++){
+          auto pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_min_max_distance_from(agent_pos, 3.0, entities, 2.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+          managers.resource->spawn(FUEL, pos);
+        }
+
+        for (auto i = 0; i < num_obstacles; i++){
+          auto pos = managers.cell->cell_to_pos(managers.cell->pop_random_min_min_max_distance_from(agent_pos, 3.0, entities, 3.0,  managers.cell->get_center(), float(managers.cell->get_world_dim())/2.0 -2.0));
+          managers.obstacle->spawn(pos);
         }
 
         ship->set_pose(agent_pos, green_goals[0]);
@@ -1926,7 +1929,12 @@ public:
         }
 
 
-        step_data.reward -= 10.0;
+        // step_data.reward -= 10.0;
+
+
+        for (auto goal : managers.goal->get_goals(GOAL_GREEN)){
+             step_data.reward -= sqrt(pow(agent->x-goal->x,2)+pow(agent->y-goal->y,2));
+        }
 
         if (step_data.done){
           step_data.reward -= (1.0-(ship->fuel->get_percentage()))*100;
